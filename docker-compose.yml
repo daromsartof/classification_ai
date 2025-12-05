@@ -1,0 +1,27 @@
+services:
+  ai-separation-app:
+    build: .
+    container_name: ai-separation-app
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
+      GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID}
+      GOOGLE_LOCATION: ${GOOGLE_LOCATION}
+      GOOGLE_PROCESSOR_ID: ${GOOGLE_PROCESSOR_ID}
+      IMAGE_BASE: /Ns
+      IMAGE_A_TRAITER: /NsOld/IMAGES_A_TRAITER
+      GOOGLE_APPLICATION_CREDENTIALS: /app/credential.json
+    volumes:
+      - ./credential.json:/app/credential.json:ro
+      # Mount your NAS shares here (update host paths as needed)
+      - /Ns:/Ns
+      - /NsOld/IMAGES_A_TRAITER:/NsOld/IMAGES_A_TRAITER
+    # Uncomment if you want to keep the container running for debugging
+    # tty: true
+    # stdin_open: true
+    # ports:
+    #   - "8000:8000"
+    restart: unless-stopped 

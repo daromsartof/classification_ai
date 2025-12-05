@@ -1,0 +1,151 @@
+from services.database_service import DatabaseService
+from services.logger import Logger
+
+logger = Logger.get_logger()
+
+class ImageRepositorie:
+    def __init__(self):
+        self.databse = DatabaseService()
+        self.pool = self.databse.get_pool()
+        self.connection = self.pool.get_connection()
+        self.cursor =  self.connection.cursor(dictionary=True)
+        
+    def get_image_to_process_by_lot_id(self, lot_id: int):
+        try:
+            query = 'select * from image where lot_id = %s'
+            
+            self.cursor.execute(query, [lot_id])
+            rows = self.cursor.fetchall()
+            return rows
+        
+        except Exception as e:
+            logger.error(f"Error fetching image by lot_id: {e}")
+            return []
+    
+    def get_image_to_process(self, image_id=None):
+        try:
+            #query = "select i.nom, l.date_scan, l.id lot_id, d.id dossier_id, d.nom dossier_name, d.site from image i join lot l on l.id = i.lot_id join dossier d on d.id = l.dossier_id where (l.status_new = 4 or l.status = 2) and date(l.date_scan) = date('2025-05-13')"
+            
+            select_clause = """
+                SELECT 
+                    distinct i.id, 
+                    i.nom name, 
+                    l.date_scan, 
+                    c.nom client_nom, 
+                    i.categorie_id, 
+                    i.exercice, 
+                    d.nom dossier_nom, 
+                    l.lot lot_num, 
+                    l.id lot_id,
+                    d.id dossier_id, 
+                    d.siren_ste, 
+                    d.rs_ste, 
+                    s.client_id client_id, 
+                    d.site_id site_id, 
+                    i.status, 
+                    i.status_new, 
+                    l.status lot_status, 
+                    l.status_new lot_status_new,
+                    act.code_ape ape,
+                    act.libelle activite_3,
+                    act_2.libelle activite_2,
+                    act_1.libelle activite_1,
+                    act_0.libelle activite_0
+                FROM image i
+            """
+            from_clause = """
+                JOIN lot l ON i.lot_id = l.id
+                JOIN dossier d ON l.dossier_id = d.id
+                JOIN site s ON s.id = d.site_id
+                JOIN client c ON c.id = s.client_id
+                JOIN activite_com_cat_3 act on act.id = d.activite_com_cat_3_id
+                JOIN activite_com_cat_2 act_2 on act_2.id = act.activite_com_cat_2_id
+                JOIN activite_com_cat_1 act_1 on act_1.id = act_2.activite_com_cat_1_id
+                JOIN activite_com_cat act_0 on act_0.id = act_1.activite_com_cat_id
+            """
+
+            if image_id:
+                where_clause = f"""
+                WHERE i.id = {image_id}"""
+            else:
+                where_clause = f"""
+                LEFT JOIN decoupage_niveau2 dc ON dc.image_id = i.id
+                LEFT JOIN ai_separation ai_s ON ai_s.image_id = i.id
+                WHERE ((((l.status_new = 4 or l.status_new = 5) and EXISTS (SELECT 1 from panier_reception pr where pr.utilisateur_id is not null and lot_id = l.id))))
+                and date(l.date_scan) >= DATE('2025-10-13') 
+                and ai_s.image_id is null
+                and i.decouper=0 order by  l.id, l.date_scan asc
+                """
+            #or (l.status = 2 and EXISTS (SELECT 1 from panier_reception pr where pr.operateur_id is not null and lot_id = l.id))
+            query = select_clause + from_clause + where_clause
+            self.cursor.execute(query)
+            rows = self.cursor.fetchall()
+            return rows
+        
+        except Exception as e:
+            logger.error(f"Error fetching image to process: {e}")
+            return []
+    
+    def get_image_by_id(self, image_id: int) -> dict:
+        try:
+            query = "select * from image where id = %s"
+            self.cursor.execute(query, [image_id])
+            res = self.cursor.fetchall() or []
+            if len(res) > 0:
+                return res[0]
+            else:
+                return None
+        except Exception as e:
+            logger.error(f"Error fetching image by id: {e}")
+            return None
+    
+    def get_image_by_name(self, name: str) -> list:
+        """Retrieve image(s) from database where name matches the search pattern.
+        
+        Args:
+            name: The name or partial name to search for
+            
+        Returns:
+            List of matching image records or empty list if no matches found
+        """
+        try:
+            query = "select i.*, d.nom dossier_name, d.siren_ste, d.rs_ste, d.id dossier_id  from image i join lot l on l.id = i.lot_id join dossier d on d.id = l.dossier_id where i.nom like  %s"
+            self.cursor.execute(query, [name])
+            res = self.cursor.fetchall() or []
+            if len(res) > 0:
+                return res[0]
+            else:
+                return {}
+        except Exception as e:
+            logger.error(f"Error fetching image by name: {e}")
+            return {} 
+    
+    def update_image(self, image_id: int, data: dict, status: int = 4) -> dict:
+        try:
+            image = self.get_image_by_id(image_id)
+            if not image:
+                raise Exception(f"Image not found for id: {image_id}")
+            if image.get('categorie_id', None):
+                image['explication'] = f"l'image a déjà été classée"
+                return image
+            query = "UPDATE `image` SET `categorie_id`=%s, `status_new`=%s WHERE `id`=%s;"
+            self.cursor.execute(query, [data['categorie_id'], status, image_id])
+            self.connection.commit()
+            image = self.get_image_by_id(image_id)
+            return image
+        except Exception as e:
+            logger.error(f"Error updating image: {e}")
+            return None
+        
+    
+    def count_status_finished_by_lot(self, lot_id: int) -> int:
+        try:
+            query = 'select count(*) lot_num from image where lot_id = %s'
+            
+            self.cursor.execute(query, [lot_id])
+            rows = self.cursor.fetchall()   
+            return rows[0].get("lot_num", 0)
+        
+        except Exception as e:
+            logger.error(f"Error count_status_finished_by_lot image by lot_id: {e}")
+            return 0
