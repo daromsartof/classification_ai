@@ -18,6 +18,7 @@ credential.json
 credentials.json
 *.pem
 *.key
+outputs
 
 # IDE
 .idea/

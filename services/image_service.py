@@ -1,187 +1,340 @@
-import os
-from dotenv import load_dotenv
-from services.document_ai_service import DocumentAI
-from typing import Optional
-import base64
-from datetime import datetime
-import shutil
-from pathlib import Path
-load_dotenv()
+"""
+Service de gestion des images et documents.
 
+Ce module fournit des fonctionnalités pour:
+- Localiser les fichiers images dans le système de fichiers
+- Traiter les documents PDF et images avec Document AI
+- Copier les fichiers vers les destinations appropriées
+"""
+
+import base64
+import os
+import shutil
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+from dotenv import load_dotenv
+
+from services.document_ai_service import DocumentAI
 from services.logger import Logger
 
+load_dotenv()
 logger = Logger.get_logger()
 
+
 class ImageService:
-    def __init__(self):
-        self.IMAGE_A_TRAITER = os.getenv('IMAGE_A_TRAITER', r'//NAS/intranet images/IMAGES_A_TRAITER') 
-        self.OLD_IMAGE_A_TRAITER = os.getenv('OLD_IMAGE_A_TRAITER', r'//NAS/intranet images/NS_SU/IMAGES_A_TRAITER')
-        self.document_ai = DocumentAI()
-        # Add these properties that seem to be used in the JavaScript version
-        self.allowed_extensions = ['.jpg', '.jpeg', '.png', '.pdf', '.tiff', '.tif']
+    """
+    Service de gestion des images et documents.
     
-    def get_image_path(self, img, ext="pdf", output_path=""):
+    Gère la localisation, le traitement et la copie des fichiers
+    images dans le système de fichiers de l'application.
+    
+    Attributes:
+        IMAGE_A_TRAITER: Chemin de base pour les images à traiter.
+        OLD_IMAGE_A_TRAITER: Chemin de l'ancien répertoire d'images.
+        document_ai: Instance du service Document AI.
+        allowed_extensions: Liste des extensions de fichiers supportées.
+    """
+    
+    # Configuration par défaut
+    DEFAULT_ALLOWED_EXTENSIONS: list[str] = [
+        '.jpg', '.jpeg', '.png', '.pdf', '.tiff', '.tif'
+    ]
+    
+    # Paramètres de retry pour les opérations fichiers
+    MAX_COPY_ATTEMPTS: int = 5
+    COPY_RETRY_DELAY: float = 0.6
+
+    def __init__(self):
+        """Initialise le service avec les chemins de configuration."""
+        self.IMAGE_A_TRAITER = os.getenv(
+            'IMAGE_A_TRAITER',
+            r'//NAS/intranet images/IMAGES_A_TRAITER'
+        )
+        self.OLD_IMAGE_A_TRAITER = os.getenv(
+            'OLD_IMAGE_A_TRAITER',
+            r'//NAS/intranet images/NS_SU/IMAGES_A_TRAITER'
+        )
+        self.document_ai = DocumentAI()
+        self.allowed_extensions = self.DEFAULT_ALLOWED_EXTENSIONS
+
+    def get_image_path(
+        self,
+        img: dict,
+        ext: str = "pdf",
+        output_path: str = ""
+    ) -> Path:
         """
-        Get image paths
+        Localise le chemin d'un fichier image dans le système.
+        
+        Recherche le fichier dans plusieurs emplacements possibles:
+        1. Répertoire principal (IMAGE_A_TRAITER)
+        2. Ancien répertoire (OLD_IMAGE_A_TRAITER)
+        3. Chemin de sortie spécifié
+        
+        Args:
+            img: Dictionnaire contenant les métadonnées de l'image:
+                - date_scan: Date de scan du document
+                - client_nom: Nom du client
+                - dossier_nom: Nom du dossier
+                - exercice: Année d'exercice
+                - lot_num: Numéro du lot
+                - name: Nom du fichier (sans extension)
+            ext: Extension du fichier (par défaut "pdf").
+            output_path: Chemin de sortie alternatif.
+            
+        Returns:
+            Chemin Path vers le fichier trouvé.
+            
+        Raises:
+            FileNotFoundError: Si le fichier n'est trouvé dans aucun emplacement.
+            
+        Example:
+            >>> service = ImageService()
+            >>> path = service.get_image_path(
+            ...     {"date_scan": "2024-01-15", "name": "DOC001", ...},
+            ...     ext="pdf"
+            ... )
         """
-        # Parse the scan date
-        date_scan = datetime.fromisoformat(img['date_scan'].replace('Z', '+00:00')) if isinstance(img['date_scan'], str) else img['date_scan']
+        # Parse de la date de scan
+        date_scan = self._parse_date_scan(img['date_scan'])
+        
         year = str(date_scan.year)
         month = str(date_scan.month).zfill(2)
         day = str(date_scan.day).zfill(2)
-        logger.info(f"IMAGE_A_TRAITER {self.IMAGE_A_TRAITER}")
-        # Build the folder source path
-        folder_source_path = Path(self.IMAGE_A_TRAITER) / img['client_nom'] / img['dossier_nom'] / str(img['exercice']) / f'{year}-{month}-{day}' / str(img['lot_num'])
         
-        # Build the source file path
-        source_path = folder_source_path / f"{img['name']}.{ext}"
-        output_path = Path(output_path)
-        #print("output_path / ", Path(output_path))
-        try:
-            source_path.stat()
+        # Construction du sous-chemin
+        date_folder = f'{year}-{month}-{day}'
+        relative_path = Path(
+            img['client_nom'],
+            img['dossier_nom'],
+            str(img['exercice']),
+            date_folder,
+            str(img['lot_num'])
+        )
+        filename = f"{img['name']}.{ext}"
+
+        logger.debug(f"Recherche du fichier: {filename}")
+
+        # Tentative dans le répertoire principal
+        source_path = Path(self.IMAGE_A_TRAITER) / relative_path / filename
+        if self._file_exists(source_path):
             return source_path
-        except Exception as e:
-            try: 
-                # Try other allowed extensions
-                folder_source_path = Path(self.OLD_IMAGE_A_TRAITER) / img['client_nom'] / img['dossier_nom'] / str(img['exercice']) / f'{year}-{month}-{day}' / str(img['lot_num'])
-                source_path = folder_source_path / f"{img['name']}.{ext}"
-                source_path.stat()
+
+        # Tentative dans l'ancien répertoire
+        source_path = Path(self.OLD_IMAGE_A_TRAITER) / relative_path / filename
+        if self._file_exists(source_path):
+            return source_path
+
+        # Tentative dans le répertoire de sortie
+        if output_path:
+            source_path = Path(output_path) / filename
+            if self._file_exists(source_path):
                 return source_path
-            except Exception as e:
-                try:
-                    source_path = output_path / f"{img['name']}.{ext}"
-                    #print("here ", source_path)
-                    source_path.stat()
-                    return  source_path
-                except Exception as e: 
-                    raise Exception(f"File not found: {source_path}") 
-                
-    
-    async def process_pdf(self, source_path: str) -> tuple[Optional[str], Optional[int]]:
+
+        raise FileNotFoundError(f"Fichier non trouvé: {filename}")
+
+    async def process_pdf(
+        self,
+        source_path: str
+    ) -> tuple[Optional[str], Optional[int]]:
         """
-        Process a PDF file using Document AI and return the extracted text and number of pages
+        Traite un fichier PDF avec Document AI.
+        
+        Extrait le texte et compte le nombre de pages du document.
         
         Args:
-            source_path: Path to the PDF file to process
-        
+            source_path: Chemin vers le fichier PDF.
+            
         Returns:
-            tuple: (extracted_text, page_count) or (None, None) if processing fails
+            Tuple contenant:
+                - str: Texte extrait (ou None si échec)
+                - int: Nombre de pages (ou None si échec)
         """
         try:
-            # Read the file content as bytes
             with open(source_path, 'rb') as f:
                 content = f.read()
-            
-            # Process the document
+
             document = await self.document_ai.document_process_request(
                 content=content,
                 mime_type='application/pdf'
             )
-            
+
             if document:
                 text = document.text
-                pages_length = len(document.pages) if hasattr(document, 'pages') else 0
-                return text, pages_length
-        
+                pages_count = len(document.pages) if hasattr(document, 'pages') else 0
+                return text, pages_count
+
         except Exception as e:
-            logger.error(f"Error processing PDF {source_path}: {str(e)}")
-        
+            logger.error(f"Erreur lors du traitement PDF {source_path}: {e}")
+
         return None, None
-    
-    async def process_image_file(self, image_path: str) -> dict:
+
+    async def process_image_file(self, image_path: str) -> Optional[object]:
         """
-        Process an image file using Document AI
+        Traite un fichier image avec Document AI.
         
         Args:
-            image_path: Path to the image file (JPEG, PNG, etc.)
-        
+            image_path: Chemin vers le fichier image (JPEG, PNG, etc.).
+            
         Returns:
-            The processed document object or None if processing fails
+            Objet document traité ou None en cas d'échec.
         """
         try:
-            # Read the file content as bytes
             with open(image_path, 'rb') as f:
                 image_bytes = f.read()
-            
-            # Convert to base64
+
             base64_encoded_image = base64.b64encode(image_bytes).decode('utf-8')
-            
-            logger.info(f"debut traitement {image_path}")
-            
-            # Process the document
+
+            logger.info(f"Début du traitement Document AI: {image_path}")
+
             document = await self.document_ai.document_process_request(
                 content=base64_encoded_image,
-                mime_type='image/jpeg'  # or appropriate mime type for your image
+                mime_type='image/jpeg'
             )
-            
-            logger.info(f"fin traitement {image_path}")
+
+            logger.info(f"Fin du traitement Document AI: {image_path}")
             return document
-        
+
         except Exception as e:
-            logger.error(f"Error processing image {image_path}: {str(e)}")
+            logger.error(f"Erreur lors du traitement image {image_path}: {e}")
             return None
-        
-    def copy_the_image(self, image, destination_path: str) -> bool:
+
+    def copy_the_image(
+        self,
+        image: dict,
+        destination_path: str
+    ) -> tuple[Path, bool]:
         """
-        Copy an image from source to destination
+        Copie un fichier image vers une destination avec gestion des erreurs.
+        
+        Implémente un mécanisme de retry pour gérer les erreurs de
+        verrouillage de fichiers Windows.
         
         Args:
-            source_path: Path to the source image file
-            destination_path: Path to the destination image file
-        Returns:
-            bool: True if copy is successful, False otherwise
-        """
-        copy_attempts = 0
-        max_attempts = 5
-        last_error = None
+            image: Dictionnaire contenant les métadonnées de l'image:
+                - path: Chemin source du fichier
+                - name: Nom du fichier (sans extension)
+            destination_path: Répertoire de destination.
             
-        while copy_attempts < max_attempts:
+        Returns:
+            Tuple contenant:
+                - Path: Chemin du fichier copié
+                - bool: True si la copie a réussi
+                
+        Note:
+            En cas d'échec après plusieurs tentatives, retourne le
+            chemin source original avec False.
+        """
+        source_path = Path(image["path"])
+        dest_dir = Path(destination_path)
+        
+        # Création du répertoire de destination
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        
+        dest_file = dest_dir / f"{image['name']}.pdf"
+        last_error: Optional[Exception] = None
+
+        for attempt in range(self.MAX_COPY_ATTEMPTS):
             try:
-                source_path = image["path"]
-                shutil.copy2(source_path, destination_path)
-                last_error = None
-                break
+                shutil.copy2(source_path, dest_dir)
+                logger.debug(f"Fichier copié avec succès: {dest_file}")
+                return dest_file, True
+                
             except PermissionError as e:
                 last_error = e
+                logger.warning(
+                    f"Tentative {attempt + 1}/{self.MAX_COPY_ATTEMPTS}: "
+                    f"Permission refusée pour {source_path}"
+                )
+                
             except OSError as e:
-                # Handle WinError 32 (file in use) and similar transient errors
+                # Gestion des erreurs Windows (fichier en cours d'utilisation)
                 if getattr(e, 'winerror', None) == 32 or "used by another process" in str(e):
                     last_error = e
+                    logger.warning(
+                        f"Tentative {attempt + 1}/{self.MAX_COPY_ATTEMPTS}: "
+                        f"Fichier verrouillé {source_path}"
+                    )
                 else:
                     raise
-            copy_attempts += 1
-            time.sleep(0.6)
-            
-        if last_error is not None:
-            logger.error(f"Failed to copy file after {max_attempts} attempts: {last_error}")
-            return source_path, False
-        Path(destination_path).mkdir(parents=True, exist_ok=True)
-        destination_path = Path(destination_path)
-        source_path = destination_path / f"{image['name']}.{"pdf"}"
-        return source_path, True
-    
-    def process_child_images(self, child_images: list, output_path: str) -> list:
+
+            time.sleep(self.COPY_RETRY_DELAY)
+
+        logger.error(
+            f"Échec de copie après {self.MAX_COPY_ATTEMPTS} tentatives: {last_error}"
+        )
+        return source_path, False
+
+    def process_child_images(
+        self,
+        child_images: list[dict],
+        output_path: str
+    ) -> list[dict]:
         """
-        Process child images by copying them to the output path
+        Traite une liste d'images enfants en les copiant vers le répertoire de sortie.
         
         Args:
-            child_images: List of child image dictionaries
-            output_path: Path to the output directory
-        
+            child_images: Liste de dictionnaires contenant les métadonnées des images.
+            output_path: Répertoire de destination.
+            
         Returns:
-            List of processed child image dictionaries with updated paths
+            Liste des images traitées avec succès (chemins mis à jour).
         """
-        processed_images = []
+        processed_images: list[dict] = []
+        
         for child_image in child_images:
             try:
-                source_path = self.get_image_path(child_image, ext="pdf", output_path=output_path)
+                # Localisation du fichier source
+                self.get_image_path(child_image, ext="pdf", output_path=output_path)
+                
+                # Copie vers la destination
                 dest_path, success = self.copy_the_image(child_image, output_path)
+                
                 if success:
                     child_image['path'] = str(dest_path)
                     processed_images.append(child_image)
                 else:
-                    logger.error(f"Failed to copy child image: {child_image['name']}")
+                    logger.error(f"Échec de copie de l'image enfant: {child_image['name']}")
+                    
             except Exception as e:
-                logger.error(f"Error processing child image {child_image['name']}: {str(e)}")
-        
+                logger.error(
+                    f"Erreur lors du traitement de l'image enfant "
+                    f"{child_image.get('name', 'unknown')}: {e}"
+                )
+
         return processed_images
+
+    @staticmethod
+    def _parse_date_scan(date_scan) -> datetime:
+        """
+        Parse une date de scan en objet datetime.
+        
+        Args:
+            date_scan: Date au format string ISO ou objet datetime.
+            
+        Returns:
+            Objet datetime.
+        """
+        if isinstance(date_scan, str):
+            return datetime.fromisoformat(date_scan.replace('Z', '+00:00'))
+        return date_scan
+
+    @staticmethod
+    def _file_exists(path: Path) -> bool:
+        """
+        Vérifie si un fichier existe.
+        
+        Args:
+            path: Chemin du fichier à vérifier.
+            
+        Returns:
+            True si le fichier existe et est accessible.
+        """
+        try:
+            path.stat()
+            return True
+        except (FileNotFoundError, OSError):
+            return False
