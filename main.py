@@ -129,6 +129,7 @@ class ImageProcessor:
         self.image_repo = ImageRepositorie()
         self.decoupage_niveau2_repo = DecoupageNiveau2Repositorie()
         self.decoupage_niveau1_controle_repo = DecoupageNiveau1ControleRepositorie()
+        self.decoupage_niveau2_controle_repo = DecoupageNiveau2ControleRepositorie()
 
     def process(
         self,
@@ -148,10 +149,17 @@ class ImageProcessor:
         try:
             # Vérification du statut du service
             self._check_service_power()
-            
             # Vérification des images enfants
             self._check_child_images(image_data)
             
+            return ProcessingResult(
+                image_id=image_data['id'],
+                categorie_id=None,
+                lot_id=image_data['lot_id'],
+                status_new=StatusNew.FINISHED,
+                success=False,
+                error_message="Image a déjà été traitée"
+            )
             # Préparation des chemins
             paths = self._prepare_paths(image_data)
             
@@ -220,15 +228,27 @@ class ImageProcessor:
 
     def _check_child_images(self, image_data: dict) -> None:
         """Vérifie le nombre d'images enfants."""
-        child_images = self.decoupage_niveau1_controle_repo.get_decoupage_niveau1_controle_by_imageId(
+        child_images_niveau1 = self.decoupage_niveau1_controle_repo.get_decoupage_niveau1_controle_by_imageId(
             image_data['id']
         )
-        
-        if len(child_images) >= self.MAX_CHILD_IMAGES:
-            raise ValueError(
-                f"Image {image_data['name']} a {len(child_images)} pages enfants. "
-                "Traitement ignoré."
-            )
+        print(child_images_niveau1)
+        images = []
+        """for child_image_niveau1 in child_images_niveau1:
+            if child_image_niveau1"""
+        #child_images_niveau2 = self.decoupage_niveau2_repo.get_decoupage_niveau2_by_imageId(
+        #    image_data['id']
+        #)
+        """image = self.image_repo.insert_image(
+                originale=child_image_niveau1['originale'],
+                ext_image=child_image_niveau1['ext_image'],
+                renommer=child_image_niveau1['renommer'],
+                nbpage=child_image_niveau1['nbpage'],
+                lot_id=child_image_niveau1['lot_id'],
+                source_image_id=child_image_niveau1['source_image_id'],
+            )"""
+        #child_images_niveau2_controle = self.decoupage_niveau2_controle_repo.get_decoupage_niveau2_controle_by_imageId(
+        #    image_data['id']
+        #)
 
     def _prepare_paths(self, image_data: dict) -> ProcessingPaths:
         """Prépare les chemins de sortie."""
@@ -626,7 +646,7 @@ def main() -> None:
             return
         
         # Récupération des images à traiter
-        images = image_repo.get_image_to_process()
+        images = image_repo.get_image_to_process(23288744)
         num_processes = ai_settings.get('thread_number', 1)
         
         logger.info(f"Démarrage du traitement avec {num_processes} processus")

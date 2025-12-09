@@ -129,7 +129,8 @@ class ImageRepositorie:
                 image['explication'] = f"l'image a déjà été classée"
                 return image
             query = "UPDATE `image` SET `categorie_id`=%s, `status_new`=%s WHERE `id`=%s;"
-            self.cursor.execute(query, [data['categorie_id'], status, image_id])
+            logger.info(f"query: {query} - data: {data.get('categorie_id', None)} - status: {status} - image_id: {image_id}")
+            self.cursor.execute(query, [data.get('categorie_id', None), status, image_id])
             self.connection.commit()
             image = self.get_image_by_id(image_id)
             return image
@@ -138,6 +139,49 @@ class ImageRepositorie:
             return None
         
     
+    def insert_image(self, originale: str, ext_image: str, renommer: str, nbpage: int, 
+                     lot_id: int, source_image_id: int, status: int, exercice: int,
+                      supprimer: int = 0, download: str = None, a_remonter: int = 0, numerotation_local: int = 0) -> int:
+        """Insert a new image record into the database.
+        
+        Args:
+            originale: Original image name
+            ext_image: Image extension
+            renommer: Renamed image name
+            nbpage: Number of pages
+            lot_id: Lot ID
+            source_image_id: Source image ID
+            status: Image status
+            download: Date of download
+            exercice: Exercise year
+            supprimer: Deletion flag (default 0)
+            a_remonter: Remontage flag (default 0)
+            numerotation_local: Local numbering flag (default 0)
+            
+        Returns:
+            The ID of the inserted image or None if error
+        """
+        try:
+            sql_insert = """
+                INSERT INTO image 
+                    (originale, ext_image, renommer, nbpage, lot_id, 
+                     source_image_id, status, exercice, supprimer, download, a_remonter, numerotation_local)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            self.cursor.execute(sql_insert, [
+                originale, ext_image, renommer, nbpage, lot_id,
+                source_image_id, status, exercice, supprimer, download, a_remonter, numerotation_local
+            ])
+            self.connection.commit()
+            inserted_id = self.cursor.lastrowid
+            image = self.get_image_by_id(inserted_id)
+            logger.info(f"Inserted new image with id: {inserted_id}")
+            return image
+        except Exception as e:
+            logger.error(f"Error inserting image: {e}")
+            self.connection.rollback()
+            return None
+        
     def count_status_finished_by_lot(self, lot_id: int) -> int:
         try:
             query = 'select count(*) lot_num from image where lot_id = %s'

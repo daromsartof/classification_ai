@@ -14,10 +14,7 @@ class DecoupageNiveau2Repositorie(BaseRepo):
             query = "select * from decoupage_niveau2 where image_id = %s"
             self.cursor.execute(query, [imageId])
             res = self.cursor.fetchall() or []
-            if len(res) > 0:
-                return res[0]
-            else:
-                return None
+            return res
         except Exception as e:
             logger.error(f"Error fetching decoupage_niveau2 by id: {e}")
             return None
@@ -28,10 +25,10 @@ class DecoupageNiveau2Repositorie(BaseRepo):
             if decoupage_niveau2:
                data['explication'] = f"l'image a déjà été classée"
                return decoupage_niveau2
-            query = "INSERT INTO `decoupage_niveau2` (`image_id`, `lot_id`, `date_creation`, `categorie_id`, `nbpage`) VALUES (%s, %s, NOW(), %s, %s, %s);"
-            self.cursor.execute(query, [data['image_id'], data['lot_id'], data['categorie_id'], data['num_page']])
+            query = "INSERT INTO `decoupage_niveau2` (`image_id`, `lot_id`, `date_creation`, `categorie_id`, `nbpage`) VALUES (%s, %s, NOW(), %s, %s);"
+            self.cursor.execute(query, [data.get('image_id'), data.get('lot_id'), data.get('categorie_id'), data.get('num_page')])
             self.connection.commit()
             return data
         except Exception as e:
-            logger.error(f"Error updating image: {e}")
+            logger.error(f"Error inserting decoupage_niveau2: {e}")
             return None

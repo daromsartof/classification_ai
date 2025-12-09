@@ -9,25 +9,23 @@ class DecoupageNiveau2ControleRepositorie(BaseRepo):
     def __init__(self):
         super().__init__()
         
-    def get_decoupage_niveau2_by_imageId(self, imageId: int) -> dict:
+    def get_decoupage_niveau2_controle_by_imageId(self, imageId: int) -> dict:
         try:
             query = "select * from decoupage_niveau2_controle where image_id = %s"
+            logger.info(f"query: {query} - imageId: {imageId}")
             self.cursor.execute(query, [imageId])
             res = self.cursor.fetchall() or []
-            if len(res) > 0:
-                return res[0]
-            else:
-                return None
+            return res
         except Exception as e:
             logger.error(f"Error fetching decoupage_niveau2 by id: {e}")
             return None
     
-    def insert_decoupage_niveau2(self, imageId: int, data: dict):
+    def insert_decoupage_niveau2_controle(self, imageId: int, data: dict):
         try:
-            decoupage_niveau2 = self.get_decoupage_niveau2_by_imageId(imageId)
-            if decoupage_niveau2:
+            decoupage_niveau2_controle = self.get_decoupage_niveau2_controle_by_imageId(imageId)
+            if decoupage_niveau2_controle:
                logger.warning(f"l'image a déjà été classée")
-               return decoupage_niveau2
+               return decoupage_niveau2_controle
             query = "INSERT INTO `decoupage_niveau2_controle` (`image_id`, `lot_id`, `date_creation`, `categorie_id`, `nbpage`) VALUES (%s, %s, NOW(), %s, %s);"
             self.cursor.execute(query, [imageId, data.get('lot_id'), data.get('categorie_id'), data.get('num_page')])
             self.connection.commit()
