@@ -128,8 +128,9 @@ class ImageRepositorie:
             if image.get('categorie_id', None):
                 image['explication'] = f"l'image a déjà été classée"
                 return image
-            query = "UPDATE `image` SET `categorie_id`=%s, `status_new`=%s WHERE `id`=%s;"
-            self.cursor.execute(query, [data['categorie_id'], status, image_id])
+            query = "UPDATE `image` SET `categorie_id`=%s, `status_new`=%s, `decouper`=%s WHERE `id`=%s;"
+            logger.info(f"query: {query} - data: {data.get('categorie_id', None)} - status: {status} - decouper: {data.get('decouper', 0)} - image_id: {image_id}")
+            self.cursor.execute(query, [data.get('categorie_id', None), status, data.get('decouper', 0), image_id])
             self.connection.commit()
             image = self.get_image_by_id(image_id)
             return image
@@ -138,6 +139,49 @@ class ImageRepositorie:
             return None
         
     
+    def insert_image(self, originale: str, ext_image: str, renommer: str, nbpage: int, 
+                     lot_id: int, source_image_id: int, status: int, exercice: int,
+                      supprimer: int = 0, download: str = None, a_remonter: int = 0, numerotation_local: int = 1) -> int:
+        """Insert a new image record into the database.
+        
+        Args:
+            originale: Original image name
+            ext_image: Image extension
+            renommer: Renamed image name
+            nbpage: Number of pages
+            lot_id: Lot ID
+            source_image_id: Source image ID
+            status: Image status
+            download: Date of download
+            exercice: Exercise year
+            supprimer: Deletion flag (default 0)
+            a_remonter: Remontage flag (default 0)
+            numerotation_local: Local numbering flag (default 0)
+            
+        Returns:
+            The ID of the inserted image or None if error
+        """
+        try:
+            sql_insert = """
+                INSERT INTO image 
+                    (originale, ext_image, renommer, nbpage, lot_id, 
+                     source_image_id, status, exercice, supprimer, download, a_remonter, numerotation_local)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            self.cursor.execute(sql_insert, [
+                originale, ext_image, renommer, nbpage, lot_id,
+                source_image_id, status, exercice, supprimer, download, a_remonter, numerotation_local
+            ])
+            self.connection.commit()
+            inserted_id = self.cursor.lastrowid
+            image = self.get_image_by_id(inserted_id)
+            logger.info(f"Inserted new image with id: {inserted_id}")
+            return image
+        except Exception as e:
+            logger.error(f"Error inserting image: {e}")
+            self.connection.rollback()
+            return None
+        
     def count_status_finished_by_lot(self, lot_id: int) -> int:
         try:
             query = 'select count(*) lot_num from image where lot_id = %s'
@@ -149,3 +193,36 @@ class ImageRepositorie:
         except Exception as e:
             logger.error(f"Error count_status_finished_by_lot image by lot_id: {e}")
             return 0
+    
+    def insert_into_image_image(self, image_id: int, image_id_autre: int) -> int:
+        try:
+            query = "INSERT INTO image_image (image_id, image_id_autre) VALUES (%s, %s)"
+            self.cursor.execute(query, [image_id, image_id_autre])
+            self.connection.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error inserting into image_image: {e}")
+            return False
+    
+    def get_image_image_by_image_id(self, image_id: int) -> list:
+        try:
+            query = """SELECT i.*, i2.nom parent_name, i2.id parent_id FROM image_image ii 
+                join image i on i.id = ii.image_id_autre 
+                join image i2 on i2.id = ii.image_id 
+                WHERE ii.image_id = %s"""
+            self.cursor.execute(query, [image_id])
+            res = self.cursor.fetchall() or []
+            return res
+        except Exception as e:
+            logger.error(f"Error fetching image_image by image_id: {e}")
+            return None
+
+    def set_image_decouper(self, image_id: int) -> bool:
+        try:
+            query = "UPDATE image SET decouper = 1 WHERE id = %s"
+            self.cursor.execute(query, [image_id])
+            self.connection.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error setting image decouper: {e}")
+            return False
