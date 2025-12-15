@@ -23,3 +23,15 @@ class AiSeparationSettingRepository:
             logger.error(f"Error fetching ai_separation_context: {e}")
             return None 
 
+    def set_power(self, power: int) -> bool:
+        """Active/désactive le service IA (colonne power)."""
+        try:
+            query = "UPDATE ai_separation_setting SET power = %s WHERE id = 1"
+            self.cursor.execute(query, [power])
+            self.connection.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating power: {e}")
+            self.connection.rollback()
+            return False
+

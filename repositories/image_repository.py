@@ -141,7 +141,7 @@ class ImageRepositorie:
     
     def insert_image(self, originale: str, ext_image: str, renommer: str, nbpage: int, 
                      lot_id: int, source_image_id: int, status: int, exercice: int,
-                      supprimer: int = 0, download: str = None, a_remonter: int = 0, numerotation_local: int = 0) -> int:
+                      supprimer: int = 0, download: str = None, a_remonter: int = 0, numerotation_local: int = 1) -> int:
         """Insert a new image record into the database.
         
         Args:
