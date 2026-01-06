@@ -152,19 +152,11 @@ class ImageProcessor:
             self._check_service_power()
             # Vérification des images enfants
             child_images = self._check_child_images(image_data)
-<<<<<<< HEAD
         
             for child_image in child_images:
                 self.process(child_image)
                 
             if (image_data.get('decouper', 0) == 1 or not image_data.get('is_child', False)) and len(child_images) > 0:
-=======
-
-            for child_image in child_images:
-                self.process(child_image)
-                
-            if image_data.get('decouper', 0) == 1 or not image_data.get('is_child', False):
->>>>>>> 99712bea8de4b063b9510c52f279220a9a538130
                 return ProcessingResult(
                     image_id=image_data['id'],
                     categorie_id=image_data['categorie_id'],
@@ -199,16 +191,11 @@ class ImageProcessor:
             # Persistance en base de données
             image_updated = self._persist_results(data, image_data, num_pages, paths)
 
-<<<<<<< HEAD
             try:
                 # Copie des fichiers
                 self._copy_files(image_data, paths, data)
             except Exception as e:
                 logger.error(e)
-=======
-            # Copie des fichiers
-            self._copy_files(image_data, paths, data)
->>>>>>> 99712bea8de4b063b9510c52f279220a9a538130
             
             # Nettoyage
             if is_local:
@@ -249,25 +236,15 @@ class ImageProcessor:
 
     def _check_child_images(self, image_data: dict) -> list[dict]:
         """Vérifie le nombre d'images enfants."""
-<<<<<<< HEAD
-=======
-
-        if image_data.get('is_child', False):
-            return []
-
->>>>>>> 99712bea8de4b063b9510c52f279220a9a538130
         child_images_niveau1 = self.decoupage_niveau1_controle_repo.get_decoupage_niveau1_controle_by_imageId(
             image_data['id']
         )
 
-<<<<<<< HEAD
 
         if image_data.get('is_child', False) or len(child_images_niveau1) <= 1:
             return []
 
        
-=======
->>>>>>> 99712bea8de4b063b9510c52f279220a9a538130
         child_images_image = self.image_repo.get_image_image_by_image_id(image_data['id'])
         child_images = []
 
@@ -294,17 +271,11 @@ class ImageProcessor:
                     image = self.image_repo.insert_image(
                         originale=child['nomdecoupee'],
                         ext_image=image_mere['ext_image'],
-<<<<<<< HEAD
                         renommer=1,
                         download=image_mere['download'],
                         nbpage=child['nbpage'],
                         lot_id=child['lot_id'],
                         status_new=image_mere['status_new'],
-=======
-                        renommer=image_mere['renommer'],
-                        nbpage=child['nbpage'],
-                        lot_id=child['lot_id'],
->>>>>>> 99712bea8de4b063b9510c52f279220a9a538130
                         status=image_mere['status'],
                         exercice=image_mere['exercice'],
                         source_image_id=image_mere['source_image_id'],
@@ -713,7 +684,7 @@ def main() -> None:
             return
         
         # Récupération des images à traiter
-        images = image_repo.get_image_to_process(23288744)
+        images = image_repo.get_image_to_process()
         num_processes = ai_settings.get('thread_number', 1)
         
         logger.info(f"Démarrage du traitement avec {num_processes} processus")
