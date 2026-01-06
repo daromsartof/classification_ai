@@ -23,6 +23,7 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import Any, Optional
 
+from numpy import imag
 import pytesseract
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
@@ -129,6 +130,7 @@ class ImageProcessor:
         self.image_repo = ImageRepositorie()
         self.decoupage_niveau2_repo = DecoupageNiveau2Repositorie()
         self.decoupage_niveau1_controle_repo = DecoupageNiveau1ControleRepositorie()
+        self.decoupage_niveau2_controle_repo = DecoupageNiveau2ControleRepositorie()
 
     def process(
         self,
@@ -148,13 +150,23 @@ class ImageProcessor:
         try:
             # Vérification du statut du service
             self._check_service_power()
-            
             # Vérification des images enfants
-            self._check_child_images(image_data)
-            
+            child_images = self._check_child_images(image_data)
+        
+            for child_image in child_images:
+                self.process(child_image)
+                
+            if (image_data.get('decouper', 0) == 1 or not image_data.get('is_child', False)) and len(child_images) > 0:
+                return ProcessingResult(
+                    image_id=image_data['id'],
+                    categorie_id=image_data['categorie_id'],
+                    lot_id=image_data['lot_id'],
+                    status_new=image_data['status_new']
+                )
+
             # Préparation des chemins
             paths = self._prepare_paths(image_data)
-            
+
             # Localisation et copie du fichier
             local_path, is_local = self._prepare_image_file(image_data, paths)
             
@@ -172,15 +184,18 @@ class ImageProcessor:
             
             # Validation et affinement
             data = self._validate_classification(data, image_data, text)
-            
+           
             # Sauvegarde OCR
             self._save_ocr_content(text, paths.output_path, image_data['name'])
             
             # Persistance en base de données
             image_updated = self._persist_results(data, image_data, num_pages, paths)
-            
-            # Copie des fichiers
-            self._copy_files(image_data, paths, data)
+
+            try:
+                # Copie des fichiers
+                self._copy_files(image_data, paths, data)
+            except Exception as e:
+                logger.error(e)
             
             # Nettoyage
             if is_local:
@@ -200,6 +215,7 @@ class ImageProcessor:
             raise
         except Exception as e:
             logger.critical(f"Erreur critique pour {image_data['name']}: {e}")
+            
             return ProcessingResult(
                 image_id=image_data['id'],
                 categorie_id=None,
@@ -218,17 +234,69 @@ class ImageProcessor:
             logger.warning("Service désactivé - arrêt du traitement")
             raise TerminatePoolException("Service désactivé")
 
-    def _check_child_images(self, image_data: dict) -> None:
+    def _check_child_images(self, image_data: dict) -> list[dict]:
         """Vérifie le nombre d'images enfants."""
-        child_images = self.decoupage_niveau1_controle_repo.get_decoupage_niveau1_controle_by_imageId(
+        child_images_niveau1 = self.decoupage_niveau1_controle_repo.get_decoupage_niveau1_controle_by_imageId(
             image_data['id']
         )
+
+
+        if image_data.get('is_child', False) or len(child_images_niveau1) <= 1:
+            return []
+
+       
+        child_images_image = self.image_repo.get_image_image_by_image_id(image_data['id'])
+        child_images = []
+
+        if len(child_images_image) > 0:
+            for child_image in child_images_image:
+                child_image = {**child_image, **{
+                    'name': child_image['originale'], 
+                    'parent_name': child_image.get('parent_name', ''),
+                    'parent_id': child_image.get('parent_id', ''),
+                    'mere': child_image.get('mere', None)
+                }}
+                
+                child_images.append(child_image)
+        else:
+            try:
+                image_mere = self.image_repo.get_image_by_id(image_data['id'])
+                # Récupère tous les enfants, y compris ceux sans "mere"
+                mere_values = {child.get('mere') for child in child_images_niveau1 if child.get('mere')}
+                child_with_existing_mere = [
+                    child for child in child_images_niveau1
+                    if (child.get('nomdecoupee') not in mere_values)
+                ]
+                for child in child_with_existing_mere:
+                    image = self.image_repo.insert_image(
+                        originale=child['nomdecoupee'],
+                        ext_image=image_mere['ext_image'],
+                        renommer=1,
+                        download=image_mere['download'],
+                        nbpage=child['nbpage'],
+                        lot_id=child['lot_id'],
+                        status_new=image_mere['status_new'],
+                        status=image_mere['status'],
+                        exercice=image_mere['exercice'],
+                        source_image_id=image_mere['source_image_id'],
+                    )
+                    self.image_repo.insert_into_image_image(image_mere['id'], image['id'])
+                    image['name'] = child['nomdecoupee']
+                    image['mere'] = child.get('mere', None)
+                    image['parent_name'] = image_data.get('name', '')
+                    image['parent_id'] = image_data.get('id', '')
+                    child_images.append(image)
+                self.image_repo.set_image_decouper(image_data['id'])
+            except Exception as e:
+                logger.error(f"Error inserting image: {e}")
+                return None
+        res = []
+        for child_image in child_images:
+            child_image = {**image_data, **child_image, **{'name': child_image['name']}}
+            child_image['is_child'] = True
+            res.append(child_image)
+        return res
         
-        if len(child_images) >= self.MAX_CHILD_IMAGES:
-            raise ValueError(
-                f"Image {image_data['name']} a {len(child_images)} pages enfants. "
-                "Traitement ignoré."
-            )
 
     def _prepare_paths(self, image_data: dict) -> ProcessingPaths:
         """Prépare les chemins de sortie."""
@@ -285,12 +353,6 @@ class ImageProcessor:
         """Compte le nombre de pages du PDF."""
         reader = PdfReader(path)
         num_pages = len(reader.pages)
-        
-        if num_pages > self.MAX_PAGES:
-            raise ValueError(
-                f"Image {name} a {num_pages} pages (max: {self.MAX_PAGES}). "
-                "Traitement ignoré."
-            )
         
         logger.info(f"Nombre de pages: {num_pages}")
         return num_pages
@@ -453,19 +515,25 @@ class ImageProcessor:
     ) -> dict:
         """Persiste les résultats en base de données."""
         # Insertion du découpage niveau 2
-        decoupage = self.decoupage_niveau2_repo.insert_decoupage_niveau2(
-            image_data['id'],
+        image_id = image_data.get('parent_id', '') if image_data.get('parent_id', '') else image_data.get('id', '')
+        nomdecoupee = image_data.get('name', '') if image_data.get('parent_name', '') else None
+        mere = image_data.get('mere', None)
+   
+        decoupage_niveau2 = self.decoupage_niveau2_repo.insert_decoupage_niveau2(
+            image_id,
             {
                 "num_page": num_pages,
-                "image_id": image_data['id'],
+                "image_id": image_id,
+                "nomdecoupee": nomdecoupee,
+                "mere": mere,
                 "lot_id": image_data['lot_id'],
                 "categorie_id": data.get('categorie_id'),
                 "sous_categorie_id": data.get('sous_categorie_id'),
                 "sous_sous_categorie_id": data.get('sous_sous_categorie_id')
             }
         )
-        
-        data['explication'] += decoupage.get('explication', "")
+
+        data['explication'] += decoupage_niveau2.get('explication', "")
         
         # Insertion de la séparation IA
         ai_separation = self.ai_separation_repo.add_ai_separation(data)
@@ -480,21 +548,17 @@ class ImageProcessor:
             "status_new": image_data.get('status_new')
         }
         
-        # Ne pas mettre à jour pour jocker et illisible
-        excluded_categories = (CategorieId.JOCKER, CategorieId.ILLISIBLE)
-        
-        if data.get("categorie_id") not in excluded_categories:
-            image_updated = self.image_repo.update_image(
-                image_data['id'],
-                data,
-                status=StatusNew.FINISHED
-            )
+        image_updated = self.image_repo.update_image(
+            image_data['id'],
+            data,
+            status=StatusNew.FINISHED
+        )
             
-            if not image_updated:
-                raise ValueError(f"Échec de mise à jour image pour {image_data['name']}")
+        if not image_updated:
+            raise ValueError(f"Échec de mise à jour image pour {image_data['name']}")
             
-            # Logging et contrôle
-            self._log_image_action(image_updated)
+        # Logging et contrôle
+        self._log_image_action(image_updated)
         
         return image_updated
 
@@ -502,12 +566,6 @@ class ImageProcessor:
         """Log l'action sur l'image."""
         try:
             log_repo = LogsRepository()
-            controle_repo = DecoupageNiveau2ControleRepositorie()
-            
-            controle_repo.insert_decoupage_niveau2(
-                image_updated['id'],
-                image_updated
-            )
             log_repo.log_action(
                 utilisateur_id=constant.GENZ_USER_ID,
                 image_id=image_updated['id']
@@ -526,13 +584,13 @@ class ImageProcessor:
         
         for attempt in range(self.MAX_COPY_ATTEMPTS):
             try:
+                logger.info("copy image")
                 shutil.copy2(image_data['path'], paths.output_path)
                 
                 # Copie vers comptabilisé si nécessaire
-                excluded = (CategorieId.JOCKER, CategorieId.ILLISIBLE)
-                if data.get("categorie_id") not in excluded:
-                    os.makedirs(paths.comptabiliser_output_path, exist_ok=True)
-                    shutil.copy2(image_data['path'], paths.comptabiliser_output_path)
+      
+                os.makedirs(paths.comptabiliser_output_path, exist_ok=True)
+                shutil.copy2(image_data['path'], paths.comptabiliser_output_path)
                 
                 return
                 
@@ -656,17 +714,14 @@ def main() -> None:
         # Mise à jour des lots terminés
         for lot_id, count in lot_success.items():
             try:
-                finished_count = image_repo.count_status_finished_by_lot(lot_id)
-                
-                if finished_count == count:
-                    lot_repo.update_lot(lot_id, {"status_new": StatusNew.FINISHED})
-                    logs_repo.log_action(
+                lot_repo.update_lot(lot_id, {"status_new": StatusNew.FINISHED})
+                logs_repo.log_action(
                         utilisateur_id=constant.GENZ_USER_ID,
                         lot_id=lot_id
-                    )
-                    panier_reception_repo.update_or_create_panier_reception(lot_id)
-                    logger.debug(f"Lot {lot_id} marqué comme terminé")
-                    
+                )
+                panier_reception_repo.update_or_create_panier_reception(lot_id)
+                logger.debug(f"Lot {lot_id} marqué comme terminé")
+
             except Exception as e:
                 logger.error(f"Erreur lors de la mise à jour du lot {lot_id}: {e}")
         
@@ -692,4 +747,13 @@ def main() -> None:
 if __name__ == "__main__":
     # Configuration du multiprocessing pour Windows
     multiprocessing.set_start_method('spawn', force=True)
-    main()
+    
+    while True:
+        main()
+        logger.info("Sleeping for 2 minutes...")
+
+        for i in range(2, 0, -1):
+            logger.info(f"{i} minutes remaining...")
+            time.sleep(60)
+
+        logger.info("Done!")
