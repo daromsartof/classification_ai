@@ -114,11 +114,15 @@ class ImageService:
             date_folder,
             str(img['lot_num'])
         )
+
         filename = f"{img['name']}.{ext}"
 
         logger.debug(f"Recherche du fichier: {filename}")
 
         # Tentative dans le répertoire principal
+        if img.get('parent_name', ''):
+            relative_path = Path(relative_path, img.get('parent_name', ''))
+
         source_path = Path(self.IMAGE_A_TRAITER) / relative_path / filename
         if self._file_exists(source_path):
             return source_path
@@ -229,17 +233,22 @@ class ImageService:
             chemin source original avec False.
         """
         source_path = Path(image["path"])
+        print("destination_path ", destination_path)
         dest_dir = Path(destination_path)
         
         # Création du répertoire de destination
         dest_dir.mkdir(parents=True, exist_ok=True)
         
-        dest_file = dest_dir / f"{image['name']}.pdf"
+        if image.get('is_child', False):
+            dest_file = dest_dir / f"{image.get('nom', '')}.{image.get('ext_image', 'pdf')}"
+        else:
+            dest_file = dest_dir / f"{image.get('name', '')}.{image.get('ext_image', 'pdf')}"
+        
         last_error: Optional[Exception] = None
 
         for attempt in range(self.MAX_COPY_ATTEMPTS):
             try:
-                shutil.copy2(source_path, dest_dir)
+                shutil.copy2(source_path, dest_file)
                 logger.debug(f"Fichier copié avec succès: {dest_file}")
                 return dest_file, True
                 

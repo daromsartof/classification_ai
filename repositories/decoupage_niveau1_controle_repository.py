@@ -9,7 +9,7 @@ class DecoupageNiveau1ControleRepositorie(BaseRepo):
     def __init__(self):
         super().__init__()
         
-    def get_decoupage_niveau1_controle_by_imageId(self, imageId: int) -> dict:
+    def get_decoupage_niveau1_controle_by_imageId(self, imageId: int) -> list:
         try:
             query = "select * from decoupage_niveau1_controle where image_id = %s"
             self.cursor.execute(query, [imageId])
