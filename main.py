@@ -552,7 +552,7 @@ class ImageProcessor:
             image_data['id'],
             data,
             status=StatusNew.FINISHED
-        )
+        )       
             
         if not image_updated:
             raise ValueError(f"Échec de mise à jour image pour {image_data['name']}")

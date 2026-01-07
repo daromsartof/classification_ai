@@ -86,7 +86,7 @@ class ImageRepositorie:
                 LEFT JOIN ai_separation ai_s ON ai_s.image_id = i.id
                 WHERE ((((l.status_new = 4 or l.status_new = 5))))
                 and date(l.date_scan) >= DATE('2025-12-18') 
-                and c.id in (671, 890, 970, 850, 962, 870, 974, 880)
+                and c.id != 559    
                 and ai_s.image_id is null
                 and i.decouper=0 order by  l.id, l.date_scan asc
                 """
