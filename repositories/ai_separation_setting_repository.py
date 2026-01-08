@@ -12,10 +12,10 @@ class AiSeparationSettingRepository:
         self.connection = self.pool.get_connection()
         self.cursor =  self.connection.cursor(dictionary=True)
         
-    def get_ai_separation_setting(self):
+    def get_ai_separation_setting(self, setting_id: int = 1):
         try:
-            query = "SELECT * FROM ai_separation_setting where id = 1 order by id desc limit 1 ;"
-            self.cursor.execute(query)
+            query = "SELECT * FROM ai_separation_setting where id = %s order by id desc limit 1 ;"
+            self.cursor.execute(query, [setting_id])
             rows = self.cursor.fetchall()
             return rows[0]
         
@@ -23,11 +23,11 @@ class AiSeparationSettingRepository:
             logger.error(f"Error fetching ai_separation_context: {e}")
             return None 
 
-    def set_power(self, power: int) -> bool:
+    def set_power(self, power: int, setting_id: int = 1) -> bool:
         """Active/désactive le service IA (colonne power)."""
         try:
-            query = "UPDATE ai_separation_setting SET power = %s WHERE id = 1"
-            self.cursor.execute(query, [power])
+            query = "UPDATE ai_separation_setting SET power = %s WHERE id = %s"
+            self.cursor.execute(query, [power, setting_id])
             self.connection.commit()
             return True
         except Exception as e:

@@ -116,8 +116,7 @@ class ImageService:
         )
 
         filename = f"{img['name']}.{ext}"
-
-        logger.debug(f"Recherche du fichier: {filename}")
+        original_filename = f"{img['originale']}.{ext}"
 
         # Tentative dans le répertoire principal
         if img.get('parent_name', ''):
@@ -125,11 +124,13 @@ class ImageService:
 
         source_path = Path(self.IMAGE_A_TRAITER) / relative_path / filename
         if self._file_exists(source_path):
+            logger.debug(f"fichier trouver dans : {source_path}")
             return source_path
 
         # Tentative dans l'ancien répertoire
         source_path = Path(self.OLD_IMAGE_A_TRAITER) / relative_path / filename
         if self._file_exists(source_path):
+            logger.debug(f"fichier trouver dans : {source_path}")
             return source_path
 
         # Tentative dans le répertoire de sortie
@@ -137,6 +138,11 @@ class ImageService:
             source_path = Path(output_path) / filename
             if self._file_exists(source_path):
                 return source_path
+
+        source_path = Path(self.OLD_IMAGE_A_TRAITER) / relative_path / original_filename
+        if self._file_exists(source_path):
+            logger.debug(f"fichier trouver dans : {source_path}")
+            return source_path
 
         raise FileNotFoundError(f"Fichier non trouvé: {filename}")
 

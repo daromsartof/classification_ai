@@ -32,7 +32,7 @@ class ImageRepositorie:
             logger.error(f"Error fetching image by lot_id: {e}")
             return []
     
-    def get_image_to_process(self, image_id=None, lot_id=None, lot_ids=[]):
+    def get_image_to_process(self, image_id=None, lot_id=None, for_validation=False):
         try:
             #query = "select i.nom, l.date_scan, l.id lot_id, d.id dossier_id, d.nom dossier_name, d.site from image i join lot l on l.id = i.lot_id join dossier d on d.id = l.dossier_id where (l.status_new = 4 or l.status = 2) and date(l.date_scan) = date('2025-05-13')"
             
@@ -40,6 +40,8 @@ class ImageRepositorie:
                 SELECT 
                     distinct i.id, 
                     i.nom name, 
+                    i.originale originale,
+                    i2.nom parent_name,
                     l.date_scan, 
                     c.nom client_nom, 
                     i.categorie_id, 
@@ -66,6 +68,8 @@ class ImageRepositorie:
             from_clause = """
                 JOIN lot l ON i.lot_id = l.id
                 JOIN dossier d ON l.dossier_id = d.id
+                LEFT JOIN image_image ii ON ii.image_id_autre = i.id
+                LEFT JOIN image i2 ON i2.id = ii.image_id
                 JOIN site s ON s.id = d.site_id
                 JOIN client c ON c.id = s.client_id
                 JOIN activite_com_cat_3 act on act.id = d.activite_com_cat_3_id
@@ -80,13 +84,16 @@ class ImageRepositorie:
             elif lot_id:
                 where_clause = f"""
                 WHERE l.id = {lot_id}"""
+            elif for_validation:
+                where_clause = f"""
+                WHERE i.supprimer = 0 and i.source_image_id = 29 """
             else:
                 where_clause = f"""
                 LEFT JOIN decoupage_niveau2 dc ON dc.image_id = i.id
                 LEFT JOIN ai_separation ai_s ON ai_s.image_id = i.id
                 WHERE ((((l.status_new = 4 or l.status_new = 5))))
-                and date(l.date_scan) >= DATE('2025-12-18') 
-                and c.id != 559    
+                and date(l.date_scan) >= DATE('2025-01-05') 
+                and c.id = 559  
                 and ai_s.image_id is null
                 and i.decouper=0 order by  l.id, l.date_scan asc
                 """
