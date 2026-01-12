@@ -32,7 +32,7 @@ class ImageRepositorie:
             logger.error(f"Error fetching image by lot_id: {e}")
             return []
     
-    def get_image_to_process(self, image_id=None, lot_id=None, for_validation=False):
+    def get_image_to_process(self, image_id=None, lot_id=None, for_validation=False, lot_ids=[]):
         try:
             #query = "select i.nom, l.date_scan, l.id lot_id, d.id dossier_id, d.nom dossier_name, d.site from image i join lot l on l.id = i.lot_id join dossier d on d.id = l.dossier_id where (l.status_new = 4 or l.status = 2) and date(l.date_scan) = date('2025-05-13')"
             
@@ -87,13 +87,15 @@ class ImageRepositorie:
             elif for_validation:
                 where_clause = f"""
                 WHERE i.supprimer = 0 and i.source_image_id = 29 """
+            if len(lot_ids) > 0:
+                where_clause = f"""
+                WHERE l.id IN ({','.join(map(str, lot_ids))})"""
             else:
                 where_clause = f"""
                 LEFT JOIN decoupage_niveau2 dc ON dc.image_id = i.id
                 LEFT JOIN ai_separation ai_s ON ai_s.image_id = i.id
                 WHERE ((((l.status_new = 4 or l.status_new = 5))))
-                and date(l.date_scan) >= DATE('2025-01-05') 
-                and c.id = 559  
+                and date(l.date_scan) >= DATE('2026-01-05')  
                 and ai_s.image_id is null
                 and i.decouper=0 order by  l.id, l.date_scan asc
                 """

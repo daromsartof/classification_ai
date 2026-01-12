@@ -684,7 +684,7 @@ def main() -> None:
             return
         
         # Récupération des images à traiter
-        images = image_repo.get_image_to_process()
+        images = image_repo.get_image_to_process()#1907980, 1907960
         num_processes = ai_settings.get('thread_number', 1)
         
         logger.info(f"Démarrage du traitement avec {num_processes} processus")
