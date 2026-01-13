@@ -11,10 +11,10 @@ class DecoupageNiveau1ControleRepositorie(BaseRepo):
         
     def get_decoupage_niveau1_controle_by_imageId(self, imageId: int) -> list:
         try:
-            query = "select * from decoupage_niveau1 where image_id = %s"
+            query = "select * from decoupage_niveau1_controle where image_id = %s"
             self.cursor.execute(query, [imageId])
             res = self.cursor.fetchall() or []
             return res
         except Exception as e:
-            logger.error(f"Error fetching decoupage_niveau2 by id: {e}")
+            logger.error(f"Error fetching decoupage_niveau1_controle by id: {e}")
             return None

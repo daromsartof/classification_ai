@@ -13,13 +13,15 @@ class AiSeparationRepository:
         self.connection = self.pool.get_connection()
         self.cursor =  self.connection.cursor(dictionary=True)
         
-    def add_ai_separation(self, data):
+    def add_ai_separation(self, data) -> int:
         try:
+            logger.info(f"Adding ai_separation")
             query = "INSERT INTO ai_separation (image_id, categorie_id, sous_categorie_id, sous_sous_categorie_id, explication, created_at, ocr_content, ratio) VALUES (%s, %s, %s, %s, %s, NOW(), %s, %s)"
-            self.cursor.execute(query, (data['image_id'], data['categorie_id'], data['sous_categorie_id'], data['sous_sous_categorie_id'], data['explication'], data.get('ocr_content', None), data.get('ratio', 0)))
+            self.cursor.execute(query, (data.get('image_id', None), data.get('categorie_id', None), data.get('sous_categorie_id', None), data.get('sous_sous_categorie_id', None), data.get('explication', ''), data.get('ocr_content', None), data.get('ratio', 0)))
             self.connection.commit()
-            return True
+            logger.info(f"Ai_separation added")
+            return self.cursor.lastrowid
         except Exception as e:
             logger.error(f"Error adding ai_separation: {e}")
-            return False 
+            return None 
 

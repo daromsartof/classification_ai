@@ -1,6 +1,6 @@
 from services.database_service import DatabaseService
 from services.logger import Logger
-
+from services.constant import StatusNew, CategorieId, SousCategorieId
 logger = Logger.get_logger()
 
 class ImageRepositorie:
@@ -35,7 +35,7 @@ class ImageRepositorie:
     def get_image_to_process(self, image_id=None, lot_id=None, for_validation=False, lot_ids=[]):
         try:
             #query = "select i.nom, l.date_scan, l.id lot_id, d.id dossier_id, d.nom dossier_name, d.site from image i join lot l on l.id = i.lot_id join dossier d on d.id = l.dossier_id where (l.status_new = 4 or l.status = 2) and date(l.date_scan) = date('2025-05-13')"
-            
+            print(image_id)
             select_clause = """
                 SELECT 
                     distinct i.id, 
@@ -43,6 +43,7 @@ class ImageRepositorie:
                     i.originale originale,
                     i2.nom parent_name,
                     l.date_scan, 
+                    i.ext_image ext_image,
                     c.nom client_nom, 
                     i.categorie_id, 
                     i.exercice, 
@@ -72,10 +73,10 @@ class ImageRepositorie:
                 LEFT JOIN image i2 ON i2.id = ii.image_id
                 JOIN site s ON s.id = d.site_id
                 JOIN client c ON c.id = s.client_id
-                JOIN activite_com_cat_3 act on act.id = d.activite_com_cat_3_id
-                JOIN activite_com_cat_2 act_2 on act_2.id = act.activite_com_cat_2_id
-                JOIN activite_com_cat_1 act_1 on act_1.id = act_2.activite_com_cat_1_id
-                JOIN activite_com_cat act_0 on act_0.id = act_1.activite_com_cat_id
+                LEFT JOIN activite_com_cat_3 act on act.id = d.activite_com_cat_3_id
+                LEFT JOIN activite_com_cat_2 act_2 on act_2.id = act.activite_com_cat_2_id
+                LEFT JOIN activite_com_cat_1 act_1 on act_1.id = act_2.activite_com_cat_1_id
+                LEFT JOIN activite_com_cat act_0 on act_0.id = act_1.activite_com_cat_id
             """
 
             if image_id:
@@ -86,8 +87,9 @@ class ImageRepositorie:
                 WHERE l.id = {lot_id}"""
             elif for_validation:
                 where_clause = f"""
-                WHERE i.supprimer = 0 and i.source_image_id = 29 """
-            if len(lot_ids) > 0:
+                LEFT JOIN ai_ocr_content ai_ocr ON ai_ocr.image_id = i.id
+                WHERE i.supprimer = 0 and i.source_image_id = 29 and ai_ocr.image_id is null and i.nom not like 'WYZ00004V' """
+            elif len(lot_ids) > 0:
                 where_clause = f"""
                 WHERE l.id IN ({','.join(map(str, lot_ids))})"""
             else:
@@ -101,7 +103,7 @@ class ImageRepositorie:
                 """
             #or (l.status = 2 and EXISTS (SELECT 1 from panier_reception pr where pr.operateur_id is not null and lot_id = l.id))
             query = select_clause + from_clause + where_clause
- 
+            print(query)
             self.cursor.execute(query)
             rows = self.cursor.fetchall()
             return rows
@@ -152,9 +154,16 @@ class ImageRepositorie:
             if image.get('categorie_id', None):
                 image['explication'] = f"l'image a déjà été classée"
                 return image
-            query = "UPDATE `image` SET `categorie_id`=%s, `status_new`=%s, `decouper`=%s WHERE `id`=%s;"
+            if image.get('status_new', None) >= StatusNew.FINISHED:
+                status = image.get('status_new', None)
+            if data.get('categorie_id', None) == CategorieId.BANQUE:
+                data['sous_categorie_id'] = SousCategorieId.RELEVER_BANCAIRE
+            else :
+                data['souscategorie_id'] = None
+                
+            query = "UPDATE `image` SET `categorie_id`=%s, `status_new`=%s, `decouper`=%s, `souscategorie_id`=%s WHERE `id`=%s;"
             logger.info(f"query: {query} - data: {data.get('categorie_id', None)} - status: {status} - decouper: {data.get('decouper', 0)} - image_id: {image_id}")
-            self.cursor.execute(query, [data.get('categorie_id', None), status, data.get('decouper', 0), image_id])
+            self.cursor.execute(query, [data.get('categorie_id', None), status, data.get('decouper', 0), data.get('souscategorie_id', None), image_id])
             self.connection.commit()
             image = self.get_image_by_id(image_id)
             return image

@@ -163,7 +163,7 @@ class OpenAIServiceVision:
             # L'image convertie sera nettoyée par le cleanup dans main.py
             # car elle utilise le pattern .ia.jpeg
             return image_path, 'image/jpeg', True
-        
+        logger.info(f"Image convertie pour Vision: {file_path}")
         # Sinon, c'est déjà une image
         return file_path, self._get_image_mime_type(file_path), False
 
@@ -191,10 +191,10 @@ class OpenAIServiceVision:
         
         # Préparation de l'image
         prepared_image_path, mime_type, _ = self._prepare_image_for_vision(image_path)
-        
+        logger.info(f"Image préparée pour Vision ")
         # Encodage en base64
         base64_image = self._encode_image_to_base64(prepared_image_path)
-        
+        logger.info(f"Image encodée en base64 ")
         # Construction du message avec l'image
         content = [
             {
@@ -467,8 +467,48 @@ class OpenAIServiceVision:
             Dictionnaire de réponse pour une erreur.
         """
         return {
-            "Categorie": "ILLISIBLES",
-            "ID": CategorieId.ILLISIBLE,
+            "Categorie": "JOCKER",
+            "ID": CategorieId.JOCKER,
             "Explication": f"Erreur GPT Vision: {error_message}"
         }
 
+    def content_extraction(
+        self,
+        image_path: str,
+        image: dict,
+        prompt_system: str,
+        model: str = OpenAIModel.GPT_4O_MINI.value
+    ) -> dict[str, Any]:
+        """
+        Extrait le contenu d'un document comptable via l'IA Vision.
+        """
+        try:
+             # Récupération des listes de tiers
+            utils_service = UtilsService()
+
+            fournisseurs, clients = utils_service.getFournisseurAndClientsList(
+                image.get('dossier_id')
+            )
+
+            # Construction du dictionnaire de remplacement
+            # Note: pas de document_text car on utilise la vision
+            replacements = self._build_replacements(image, fournisseurs, clients)
+            
+            # Récupération des contextes personnalisés
+            self._add_custom_contexts(replacements, image)
+
+            # Application des remplacements au prompt
+            if prompt_system:
+                prompt_system = self._apply_replacements(prompt_system, replacements)
+
+            user_prompt = "Extrait le contenu de la facture"
+            response = self.call_agent_vision(
+                system_prompt=prompt_system,
+                image_path=image_path,
+                user_prompt=user_prompt,
+                model=model
+            )
+            return self.response_parse(response)
+        except Exception as e:
+            logger.error(f"Erreur de extraction de contenu: {e}")
+            return self._create_error_response(str(e))

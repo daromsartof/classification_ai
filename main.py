@@ -9,6 +9,7 @@ Ce module orchestre le pipeline de classification automatique des documents:
 5. Mise à jour de la base de données et copie des fichiers
 """
 
+import argparse
 import asyncio
 import multiprocessing
 import os
@@ -660,11 +661,16 @@ def process_single_image(
     }
 
 
-def main() -> None:
+def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: Optional[list[int]] = None) -> None:
     """
     Point d'entrée principal pour le traitement par lots.
     
     Orchestre le traitement parallèle des images en attente.
+    
+    Args:
+        image_id: ID d'une image spécifique à traiter (optionnel).
+        lot_id: ID d'un lot spécifique à traiter (optionnel).
+        lot_ids: Liste d'IDs de lots à traiter (optionnel).
     """
     pool: Optional[Pool] = None
     
@@ -683,8 +689,21 @@ def main() -> None:
             logger.warning("Service IA désactivé ou non configuré")
             return
         
+        # Conversion de lot_ids en liste si fourni comme string
+        lot_ids_list = []
+        if lot_ids:
+            if isinstance(lot_ids, str):
+                # Si c'est une chaîne, la convertir en liste d'entiers
+                lot_ids_list = [int(x.strip()) for x in lot_ids.split(',') if x.strip()]
+            elif isinstance(lot_ids, list):
+                lot_ids_list = lot_ids
+        
         # Récupération des images à traiter
-        images = image_repo.get_image_to_process()#1907980, 1907960
+        images = image_repo.get_image_to_process(
+            image_id=image_id,
+            lot_id=lot_id,
+            lot_ids=lot_ids_list
+        )
         num_processes = ai_settings.get('thread_number', 1)
         
         logger.info(f"Démarrage du traitement avec {num_processes} processus")
@@ -748,8 +767,39 @@ if __name__ == "__main__":
     # Configuration du multiprocessing pour Windows
     multiprocessing.set_start_method('spawn', force=True)
     
+    # Configuration des arguments en ligne de commande
+    parser = argparse.ArgumentParser(
+        description="Traitement par lots des images pour la classification automatique"
+    )
+    parser.add_argument(
+        '--image_id',
+        type=int,
+        default=None,
+        help='ID d\'une image spécifique à traiter'
+    )
+    parser.add_argument(
+        '--lot_id',
+        type=int,
+        default=None,
+        help='ID d\'un lot spécifique à traiter'
+    )
+    parser.add_argument(
+        '--lot_ids',
+        type=str,
+        default=None,
+        help='Liste d\'IDs de lots à traiter (séparés par des virgules, ex: 1,2,3)'
+    )
+    
+    args = parser.parse_args()
+    
     while True:
-        main()
+        main(
+            image_id=args.image_id,
+            lot_id=args.lot_id,
+            lot_ids=args.lot_ids
+        )
+        if args.image_id or args.lot_id or args.lot_ids:
+            sys.exit(0)
         logger.info("Sleeping for 2 minutes...")
 
         for i in range(2, 0, -1):

@@ -28,8 +28,20 @@ class CategorieId(IntEnum):
     GESTION = 25
     BANQUE = 16
     ILLISIBLE = 18
+    JURIDIQUES = 24
+    FISCAL = 21
+    SOCIAL = 20
     JOCKER = 49
     COURRIER = 23
+    
+class SousCategorieId(IntEnum):
+    """
+    Identifiants des sous-catégories de documents.
+    
+    Attributes:
+        RELEVER_BANCAIRE: Relevés bancaires
+    """
+    RELEVER_BANCAIRE = 10
 
 
 class OcrLibrary(str, Enum):
