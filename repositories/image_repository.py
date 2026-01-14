@@ -32,7 +32,7 @@ class ImageRepositorie:
             logger.error(f"Error fetching image by lot_id: {e}")
             return []
     
-    def get_image_to_process(self, image_id=None, lot_id=None, for_validation=False, lot_ids=[]):
+    def get_image_to_process(self, image_id=None, lot_id=None, for_validation=False, lot_ids=[], client_id=None):
         try:
             #query = "select i.nom, l.date_scan, l.id lot_id, d.id dossier_id, d.nom dossier_name, d.site from image i join lot l on l.id = i.lot_id join dossier d on d.id = l.dossier_id where (l.status_new = 4 or l.status = 2) and date(l.date_scan) = date('2025-05-13')"
             print(image_id)
@@ -98,9 +98,11 @@ class ImageRepositorie:
                 LEFT JOIN ai_separation ai_s ON ai_s.image_id = i.id
                 WHERE ((((l.status_new = 4 or l.status_new = 5))))
                 and date(l.date_scan) >= DATE('2026-01-05')  
-                and ai_s.image_id is null
-                and i.decouper=0 order by  l.id, l.date_scan asc
-                """
+                and ai_s.image_id is null """
+                if client_id:
+                    where_clause += f"and s.client_id = {client_id} "
+                where_clause += "and i.decouper=0 order by  l.id, l.date_scan asc"
+                
             #or (l.status = 2 and EXISTS (SELECT 1 from panier_reception pr where pr.operateur_id is not null and lot_id = l.id))
             query = select_clause + from_clause + where_clause
             print(query)

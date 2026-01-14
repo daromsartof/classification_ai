@@ -661,7 +661,7 @@ def process_single_image(
     }
 
 
-def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: Optional[list[int]] = None) -> None:
+def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: Optional[list[int]] = None, client_id: Optional[int] = None) -> None:
     """
     Point d'entrée principal pour le traitement par lots.
     
@@ -702,7 +702,8 @@ def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: 
         images = image_repo.get_image_to_process(
             image_id=image_id,
             lot_id=lot_id,
-            lot_ids=lot_ids_list
+            lot_ids=lot_ids_list,
+            client_id=client_id
         )
         num_processes = ai_settings.get('thread_number', 1)
         
@@ -789,6 +790,13 @@ if __name__ == "__main__":
         default=None,
         help='Liste d\'IDs de lots à traiter (séparés par des virgules, ex: 1,2,3)'
     )
+
+    parser.add_argument(
+        '--client_id',
+        type=int,
+        default=None,
+        help='ID du client à traiter'
+    )
     
     args = parser.parse_args()
     
@@ -796,9 +804,10 @@ if __name__ == "__main__":
         main(
             image_id=args.image_id,
             lot_id=args.lot_id,
-            lot_ids=args.lot_ids
+            lot_ids=args.lot_ids,
+            client_id=args.client_id
         )
-        if args.image_id or args.lot_id or args.lot_ids:
+        if args.image_id or args.lot_id or args.lot_ids or args.client_id:
             sys.exit(0)
         logger.info("Sleeping for 2 minutes...")
 

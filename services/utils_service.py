@@ -9,8 +9,10 @@ plusieurs autres services, notamment:
 """
 
 import os
+import re
 from pathlib import Path
 from typing import Optional
+from datetime import date
 
 from pdf2image import convert_from_path
 from PIL import Image
@@ -18,7 +20,6 @@ from PIL import Image
 from repositories.tiers_repository import TiersRepository
 from services.logger import Logger
 from services.opencv_service import OpenCvService
-
 logger = Logger.get_logger()
 
 
@@ -38,6 +39,14 @@ class UtilsService:
     DEFAULT_IMAGE_EXTENSIONS: list[str] = [
         '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.pdf'
     ]
+
+    def __init__(self):
+        self.status = {
+            "vert": 1,
+            "jaune": 2,
+            "rouge": 0
+        }
+        self.CATEGORIE_CLIENT = 9
 
     async def convert_pdf_to_images(
         self,
@@ -250,3 +259,74 @@ class UtilsService:
         clients = f"[ {', '.join(clients_list)} ]"
         
         return fournisseurs, clients
+
+    def convert_certainty(self, certainty):
+        """Retourne la valeur numérique associée à la couleur de certitude."""
+        return self.status.get(certainty)
+
+    def test_date_format(self, date_str):
+        """
+        Vérifie si une chaîne correspond à l'un des formats de date supportés
+        et valide la cohérence du calendrier (ex: évite le 31 février).
+        """
+        date_formats = [
+            {
+                'name': 'YYYY-MM-DD',
+                'regex': r'^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$',
+                'example': '2023-12-31'
+            },
+            {
+                'name': 'DD/MM/YYYY',
+                'regex': r'^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}$',
+                'example': '31/12/2023'
+            },
+            {
+                'name': 'MM-DD-YYYY',
+                'regex': r'^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])-\d{4}$',
+                'example': '12-31-2023'
+            },
+            {
+                'name': 'YYYY/MM/DD',
+                'regex': r'^\d{4}/(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])$',
+                'example': '2023/12/31'
+            },
+            {
+                'name': 'DD-MM-YYYY',
+                'regex': r'^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-\d{4}$',
+                'example': '31-12-2023'
+            }
+        ]
+
+        for fmt in date_formats:
+            if re.match(fmt['regex'], date_str):
+                # Séparation des segments par les séparateurs courants (- ou /)
+                parts = re.split(r'[-/]', date_str)
+                year, month, day = 0, 0, 0
+
+                # Extraction selon le format identifié
+                if fmt['name'] in ['YYYY-MM-DD', 'YYYY/MM/DD']:
+                    year, month, day = map(int, parts)
+                elif fmt['name'] in ['DD/MM/YYYY', 'DD-MM-YYYY']:
+                    day, month, year = map(int, parts)
+                elif fmt['name'] == 'MM-DD-YYYY':
+                    month, day, year = map(int, parts)
+
+                try:
+                    # Python lève une erreur si la date est invalide (ex: 30 Février)
+                    valid_date = date(year, month, day)
+                    return {
+                        "isValid": True,
+                        "format": fmt['name'],
+                        "date": valid_date,
+                        "example": fmt['example']
+                    }
+                except ValueError:
+                    # La regex est passée mais la date n'existe pas dans le calendrier
+                    continue
+
+        return {
+            "isValid": False,
+            "format": None,
+            "date": None,
+            "example": None
+        }

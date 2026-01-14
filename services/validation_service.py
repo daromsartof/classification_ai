@@ -18,6 +18,7 @@ from services import constant
 from services.constant import CategorieId
 from services.logger import Logger
 from services.utils_service import UtilsService
+from services.human import Humain
 
 logger = Logger.get_logger()
 
@@ -384,3 +385,50 @@ class ValidationService:
         logger.debug(f"RS vs Recepteur: {recepteur} <-> {dossier_rs} = {dossier_rs_recepteur_ratio}%")
         logger.debug(f"Nom vs Recepteur: {recepteur} <-> {dossier_nom} = {dossier_name_recepteur_ratio}%")
         logger.debug("=" * 50)
+
+    
+    def content_validation(self, content: dict, image_data: dict) -> dict:
+        """
+        Valide le contenu de la facture.
+        """
+
+        try:
+            new_content = {}
+            human = Humain()
+            rs = content.get('rs', '').upper()
+            dossier_nom = image_data.get('dossier_nom', '').upper()
+            rs_ratio = self._calculate_similarity(dossier_nom, rs)
+            new_content['rs'] = {
+                "value": rs,
+                "ratio": rs_ratio,
+                "explication": "Raison sociale de la facture"
+            }
+            date_facture = {
+                "value": content.get('date_facture', ''),
+                "ratio": 0,
+                "explication": "Date de facture"
+            }
+            date_livraison = {
+                "value": content.get('date_livraison', ''),
+                "ratio": 0,
+                "explication": "Date de livraison"
+            }
+            new_content['date_facture'] = human.date_facture_validation(date_facture)
+            new_content['periode_debut'] = human.date_facture_validation({
+                "value": content.get('periode_debut', ''),
+                "ratio": 0,
+                "explication": "Date de début de la période"
+            })
+            new_content['periode_fin'] = human.date_facture_validation({
+                "value": content.get('periode_fin', ''),
+                "ratio": 0,
+                "explication": "Date de fin de la période"
+            })
+            new_content['date_livraison'] = human.date_livraison_validation(date_livraison, date_facture)
+
+            content.update(new_content)
+            return content
+        except Exception as e:
+            logger.error(f"Erreur lors de la validation du contenu: {e}")
+
+        return content

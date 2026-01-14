@@ -181,7 +181,7 @@ class ImageProcessor:
             # text = self._extract_text(local_path, image_data['name'])
             # Validation de la classification
             classification = self._validate_classify_document("", image_data, prompts['ai_prompt_classification'])
-       
+
             # Construction des données de résultat
             data = self._build_classification_data(classification, image_data)
             prompt_extract_content = prompts['ai_prompt_extract_content']
@@ -198,7 +198,9 @@ class ImageProcessor:
                 invoice_content = data.get('data', {})
             else:
                 invoice_content = self._extract_invoice_content("", image_data, prompt_extract_content)
-
+                
+            invoice_content = self.validation_service.content_validation(invoice_content, image_data)
+           
             # Persistance en base de données
             ai_separation = self.ai_separation_repo.add_ai_separation(data)
             if not ai_separation:
@@ -555,7 +557,7 @@ def main() -> None:
             return
         
         # Récupération des images à traiter
-        images = image_repo.get_image_to_process(for_validation=True)
+        images = image_repo.get_image_to_process(for_validation=True, image_id=23365781)
        
         num_processes = ai_settings.get('thread_number', 1)
         
