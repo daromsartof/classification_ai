@@ -17,13 +17,13 @@ class LogsRepository:
                     INSERT INTO logs (date_debut, date_fin, etape_traitement_id, remarque, utilisateur_id, image_id)
                     VALUES (NOW(), NOW(), 2, 'SEPARATION AVEC GENZIA', %s, %s);
                 """
-                params = (utilisateur_id, image_id)
+                params = [utilisateur_id, image_id]
             else:
                 query = """
                     INSERT INTO logs (date_debut, date_fin, etape_traitement_id, remarque, utilisateur_id, lot_id)
                     VALUES (NOW(), NOW(), 2, 'SEPARATION AVEC GENZIA', %s, %s);
                 """
-                params = (utilisateur_id, lot_id)
+                params = [utilisateur_id, lot_id]
 
             self.cursor.execute(query, params)
             self.connection.commit()

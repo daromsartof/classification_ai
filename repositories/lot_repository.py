@@ -30,7 +30,7 @@ class LotRepositorie:
             if 'status_new' not in data:
                 raise ValueError("Missing 'status_new' in data")
             query = "UPDATE lot SET status_new = %s WHERE id = %s"
-            self.cursor.execute(query, (data.get('status_new', 6), lot_id))
+            self.cursor.execute(query, [data.get('status_new', 6), lot_id])
             self.connection.commit()
             logger.info(f"Lot {lot_id} updated successfully with status_new = {data.get('status_new', 6)}")
             return True

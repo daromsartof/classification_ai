@@ -186,11 +186,7 @@ class ImageProcessor:
             data = self._build_classification_data(classification, image_data)
             prompt_extract_content = prompts['ai_prompt_extract_content']
 
-            if data.get('categorie_id') == CategorieId.FOURNISSEUR:
-                prompt_extract_content = prompts['ai_prompt_extract_content']
-            elif data.get('categorie_id') == CategorieId.CLIENT:
-                prompt_extract_content = prompts['ai_prompt_extract_content']
-            elif data.get('categorie_id') == CategorieId.BANQUE:
+            if data.get('categorie_id') == CategorieId.BANQUE:
                 with open('services/prompts/banque.md', 'r', encoding='utf-8') as f:
                     prompt_extract_content = f.read()
             # Extraction du contenu de la facture
@@ -199,9 +195,13 @@ class ImageProcessor:
             else:
                 invoice_content = self._extract_invoice_content("", image_data, prompt_extract_content)
                 
-            invoice_content = self.validation_service.content_validation(invoice_content, image_data)
+            if data.get('categorie_id') == CategorieId.FOURNISSEUR:
+                invoice_content = self.validation_service.content_validation(invoice_content, image_data)
+                
+           
            
             # Persistance en base de données
+            data['image_id'] = image_data['id']
             ai_separation = self.ai_separation_repo.add_ai_separation(data)
             if not ai_separation:
                 raise ValueError(f"Échec d'insertion ai_separation pour {image_data['name']}")
@@ -557,7 +557,7 @@ def main() -> None:
             return
         
         # Récupération des images à traiter
-        images = image_repo.get_image_to_process(for_validation=True, image_id=23365781)
+        images = image_repo.get_image_to_process(for_validation=True)
        
         num_processes = ai_settings.get('thread_number', 1)
         

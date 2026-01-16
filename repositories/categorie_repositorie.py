@@ -25,8 +25,8 @@ class CategorieRepositorie:
                query += f" AND sc.id = {souscategorie_id} "
             if (soussouscategorie_id):
                 query += f"AND ssc.id = {soussouscategorie_id} "
-                
-            self.cursor.execute(query, (categorie_id))
+
+            self.cursor.execute(query, [categorie_id])
             result = self.cursor.fetchone()
             return result and result.get('count', 0) > 0
         except Exception as e:
@@ -43,7 +43,7 @@ class CategorieRepositorie:
                 "SELECT COUNT(*) as count FROM souscategorie "
                 "WHERE id = %s AND categorie_id = %s"
             )
-            self.cursor.execute(query, (souscategorie_id, categorie_id))
+            self.cursor.execute(query, [souscategorie_id, categorie_id])
             result = self.cursor.fetchone()
             return result and result.get('count', 0) > 0
         except Exception as e:
@@ -60,7 +60,7 @@ class CategorieRepositorie:
                 "SELECT COUNT(*) as count FROM soussouscategorie "
                 "WHERE id = %s AND souscategorie_id = %s"
             )
-            self.cursor.execute(query, (soussouscategorie_id, souscategorie_id))
+            self.cursor.execute(query, [soussouscategorie_id, souscategorie_id])
             result = self.cursor.fetchone()
             return result and result.get('count', 0) > 0
         except Exception as e:
