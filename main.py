@@ -661,7 +661,7 @@ def process_single_image(
     }
 
 
-def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: Optional[list[int]] = None, client_id: Optional[int] = None) -> None:
+def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: Optional[list[int]] = None, client_id: Optional[int] = None, dossier_id: Optional[int] = None) -> None:
     """
     Point d'entrée principal pour le traitement par lots.
     
@@ -703,7 +703,8 @@ def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: 
             image_id=image_id,
             lot_id=lot_id,
             lot_ids=lot_ids_list,
-            client_id=client_id
+            client_id=client_id,
+            dossier_id=dossier_id
         )
         num_processes = ai_settings.get('thread_number', 1)
         
@@ -797,6 +798,13 @@ if __name__ == "__main__":
         default=None,
         help='ID du client à traiter'
     )
+
+    parser.add_argument(
+        '--dossier_id',
+        type=int,
+        default=None,
+        help='ID du dossier à traiter'
+    )
     
     args = parser.parse_args()
     
@@ -805,9 +813,10 @@ if __name__ == "__main__":
             image_id=args.image_id,
             lot_id=args.lot_id,
             lot_ids=args.lot_ids,
-            client_id=args.client_id
+            client_id=args.client_id,
+            dossier_id=args.dossier_id
         )
-        if args.image_id or args.lot_id or args.lot_ids or args.client_id:
+        if args.image_id or args.lot_id or args.lot_ids or args.client_id or args.dossier_id:
             sys.exit(0)
         logger.info("Sleeping for 2 minutes...")
 
