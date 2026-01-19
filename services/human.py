@@ -36,7 +36,7 @@ class Humain:
         # En Python, date_obj est déjà un objet datetime.date issu de notre conversion précédente
         date_year = date_obj.year
 
-        if abs(current_year - date_year) > 2:
+        if abs(current_year - date_year) > 2 or date_year < 2025:
             result.update({
                 "ratio": 0,
                 "explication": "Année hors plage acceptable (±2 ans)"
@@ -59,7 +59,7 @@ class Humain:
         if not value_liv:
             return {
                 "value": date_facture.get('value'),
-                "ratio": 90,
+                "ratio": 0,
                 "explication": "Date manquante"
             }
 
@@ -97,7 +97,7 @@ class Humain:
             return result
 
         result.update({
-            "ratio": 90,
+            "ratio": 96,
             "explication": "Date de livraison dans la plage acceptable (±30 jours de la date de facture)"
         })
         return result
