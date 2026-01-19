@@ -88,7 +88,7 @@ class ImageRepositorie:
             elif for_validation:
                 where_clause = f"""
                 LEFT JOIN ai_ocr_content ai_ocr ON ai_ocr.image_id = i.id
-                WHERE i.supprimer = 0 and i.source_image_id = 29 and ai_ocr.image_id is null and i.nom not like 'WYZ00004V' """
+                WHERE i.supprimer = 0 and i.source_image_id = 29 and ai_ocr.image_id is null limit 50 """
             elif len(lot_ids) > 0:
                 where_clause = f"""
                 WHERE l.id IN ({','.join(map(str, lot_ids))})"""
