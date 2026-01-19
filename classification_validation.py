@@ -557,7 +557,7 @@ def main() -> None:
             return
         
         # Récupération des images à traiter
-        images = image_repo.get_image_to_process(for_validation=True)
+        images = image_repo.get_image_to_process(for_validation=True, image_id=23409453)
        
         num_processes = ai_settings.get('thread_number', 1)
         
