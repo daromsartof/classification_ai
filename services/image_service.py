@@ -126,19 +126,22 @@ class ImageService:
         if self._file_exists(source_path):
             logger.debug(f"fichier trouver dans : {source_path}")
             return source_path
-
+        
+        logger.debug(f"fichier non trouver dans : {source_path}")
         # Tentative dans l'ancien répertoire
         source_path = Path(self.OLD_IMAGE_A_TRAITER) / relative_path / filename
         if self._file_exists(source_path):
             logger.debug(f"fichier trouver dans : {source_path}")
             return source_path
 
+        logger.debug(f"fichier non trouver dans : {source_path}")
         # Tentative dans le répertoire de sortie
         if output_path:
             source_path = Path(output_path) / filename
             if self._file_exists(source_path):
                 return source_path
 
+        logger.debug(f"fichier non trouver dans : {source_path}")
         source_path = Path(self.OLD_IMAGE_A_TRAITER) / relative_path / original_filename
         if self._file_exists(source_path):
             logger.debug(f"fichier trouver dans : {source_path}")

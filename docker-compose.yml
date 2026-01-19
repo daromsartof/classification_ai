@@ -15,7 +15,7 @@ services:
       GOOGLE_LOCATION: ${GOOGLE_LOCATION}
       GOOGLE_PROCESSOR_ID: ${GOOGLE_PROCESSOR_ID}
       # Chemins des images dans le conteneur
-      IMAGE_BASE: /Ns
+      NAS_BASE: /Ns
       IMAGE_A_TRAITER: /NsOld/IMAGES_A_TRAITER
       # Fichier de credentials monté comme volume
       GOOGLE_APPLICATION_CREDENTIALS: /app/credential.json
@@ -24,8 +24,9 @@ services:
       - ./credential.json:/app/credential.json:ro
 
       # Monte tes partages NAS (adapter les chemins HOST à ton serveur)
-      - /Ns:/Ns
-      - /NsOld/IMAGES_A_TRAITER:/NsOld/IMAGES_A_TRAITER
+      # On monte la racine des partages pour être sûr
+      - "/Ns:/Ns"
+      - "/NsOld:/NsOld"
 
     # Décommente si ton script démarre une API (FastAPI, Flask, etc.)
     # ports:
