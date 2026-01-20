@@ -16,7 +16,7 @@ services:
       IMAGE_COMPTABILISEE_BASE: /hdd1/IMAGES/images
       IMAGE_A_TRAITER: /hdd1/IMAGES/images
     volumes:
-      - "/hdd1:/hdd1"
+      - "/hdd1:/hdd1:z"
 
     # Décommente si ton script démarre une API (FastAPI, Flask, etc.)
     # ports:
