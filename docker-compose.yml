@@ -12,9 +12,9 @@ services:
       DB_DATABASE: ${DB_DATABASE}
       # Chemins des images dans le conteneur
       NAS_BASE: /hdd1
-      IMAGE_BASE: /hdd1
-      IMAGE_COMPTABILISEE_BASE: /hdd1
-      IMAGE_A_TRAITER: /hdd1
+      IMAGE_BASE: /hdd1/IMAGES/images
+      IMAGE_COMPTABILISEE_BASE: /hdd1/IMAGES/images
+      IMAGE_A_TRAITER: /hdd1/IMAGES/images
     volumes:
       - "/hdd1:/hdd1"
 
