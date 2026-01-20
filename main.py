@@ -377,15 +377,6 @@ class ImageProcessor:
             logger.info(f"Extraction EasyOCR pour {name}")
             text = easy_ocr_service.extract_text(converted_path)
             
-        elif ocr_library == OcrLibrary.DOCUMENT_AI.value:
-            logger.info(f"Extraction Document AI pour {name}")
-            document = asyncio.run(
-                self.image_service.process_image_file(converted_path)
-            )
-            if not document:
-                raise ValueError(f"Échec Document AI pour {name}")
-            text = document.text
-            
         elif ocr_library == OcrLibrary.CUSTOM_PYTESSERACT.value:
             logger.info(f"Extraction Pytesseract personnalisé pour {name}")
             text = self.ocr_service.extract_from_image(converted_path)

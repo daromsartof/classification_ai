@@ -16,8 +16,6 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-
-from services.document_ai_service import DocumentAI
 from services.logger import Logger
 
 load_dotenv()
@@ -34,7 +32,6 @@ class ImageService:
     Attributes:
         IMAGE_A_TRAITER: Chemin de base pour les images à traiter.
         OLD_IMAGE_A_TRAITER: Chemin de l'ancien répertoire d'images.
-        document_ai: Instance du service Document AI.
         allowed_extensions: Liste des extensions de fichiers supportées.
     """
     
@@ -57,7 +54,6 @@ class ImageService:
             'OLD_IMAGE_A_TRAITER',
             r'//NAS/intranet images/NS_SU/IMAGES_A_TRAITER'
         )
-        self.document_ai = DocumentAI()
         self.allowed_extensions = self.DEFAULT_ALLOWED_EXTENSIONS
 
     def get_image_path(
@@ -148,72 +144,6 @@ class ImageService:
             return source_path
 
         raise FileNotFoundError(f"Fichier non trouvé: {filename}")
-
-    async def process_pdf(
-        self,
-        source_path: str
-    ) -> tuple[Optional[str], Optional[int]]:
-        """
-        Traite un fichier PDF avec Document AI.
-        
-        Extrait le texte et compte le nombre de pages du document.
-        
-        Args:
-            source_path: Chemin vers le fichier PDF.
-            
-        Returns:
-            Tuple contenant:
-                - str: Texte extrait (ou None si échec)
-                - int: Nombre de pages (ou None si échec)
-        """
-        try:
-            with open(source_path, 'rb') as f:
-                content = f.read()
-
-            document = await self.document_ai.document_process_request(
-                content=content,
-                mime_type='application/pdf'
-            )
-
-            if document:
-                text = document.text
-                pages_count = len(document.pages) if hasattr(document, 'pages') else 0
-                return text, pages_count
-
-        except Exception as e:
-            logger.error(f"Erreur lors du traitement PDF {source_path}: {e}")
-
-        return None, None
-
-    async def process_image_file(self, image_path: str) -> Optional[object]:
-        """
-        Traite un fichier image avec Document AI.
-        
-        Args:
-            image_path: Chemin vers le fichier image (JPEG, PNG, etc.).
-            
-        Returns:
-            Objet document traité ou None en cas d'échec.
-        """
-        try:
-            with open(image_path, 'rb') as f:
-                image_bytes = f.read()
-
-            base64_encoded_image = base64.b64encode(image_bytes).decode('utf-8')
-
-            logger.info(f"Début du traitement Document AI: {image_path}")
-
-            document = await self.document_ai.document_process_request(
-                content=base64_encoded_image,
-                mime_type='image/jpeg'
-            )
-
-            logger.info(f"Fin du traitement Document AI: {image_path}")
-            return document
-
-        except Exception as e:
-            logger.error(f"Erreur lors du traitement image {image_path}: {e}")
-            return None
 
     def copy_the_image(
         self,

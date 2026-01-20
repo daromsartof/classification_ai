@@ -52,12 +52,10 @@ class OcrLibrary(str, Enum):
         TESSERACT: OCR Tesseract standard
         EASYOCR: Bibliothèque EasyOCR
         CUSTOM_PYTESSERACT: Version personnalisée de Pytesseract
-        DOCUMENT_AI: Google Document AI
     """
     TESSERACT = "pytesseract"
     EASYOCR = "easy_ocr"
     CUSTOM_PYTESSERACT = "custom_pytesseract"
-    DOCUMENT_AI = "document_ai"
 
 
 class OpenAIModel(str, Enum):
@@ -130,7 +128,6 @@ ocr_library = {
     "tesseract": OcrLibrary.TESSERACT.value,
     "easyocr": OcrLibrary.EASYOCR.value,
     "custom_pytesseract": OcrLibrary.CUSTOM_PYTESSERACT.value,
-    "document_ai": OcrLibrary.DOCUMENT_AI.value,
 }
 
 model = {

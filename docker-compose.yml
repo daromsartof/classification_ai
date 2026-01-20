@@ -10,23 +10,13 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_DATABASE: ${DB_DATABASE}
-      # Google Document AI
-      GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID}
-      GOOGLE_LOCATION: ${GOOGLE_LOCATION}
-      GOOGLE_PROCESSOR_ID: ${GOOGLE_PROCESSOR_ID}
       # Chemins des images dans le conteneur
-      NAS_BASE: /Ns
-      IMAGE_A_TRAITER: /NsOld/IMAGES_A_TRAITER
-      # Fichier de credentials monté comme volume
-      GOOGLE_APPLICATION_CREDENTIALS: /app/credential.json
+      NAS_BASE: /hdd1
+      IMAGE_BASE: /hdd1
+      IMAGE_COMPTABILISEE_BASE: /hdd1
+      IMAGE_A_TRAITER: /hdd1
     volumes:
-      # Monte le fichier de credentials Google (présent sur le serveur à côté du docker-compose)
-      - ./credential.json:/app/credential.json:ro
-
-      # Monte tes partages NAS (adapter les chemins HOST à ton serveur)
-      # On monte la racine des partages pour être sûr
-      - "/Ns:/Ns"
-      - "/NsOld:/NsOld"
+      - "/hdd1:/hdd1"
 
     # Décommente si ton script démarre une API (FastAPI, Flask, etc.)
     # ports:
