@@ -208,7 +208,17 @@ class OpenAIServiceVision:
                 }
             }
         ]
-        
+        system_prompt = system_prompt + """
+            ===============
+            Notez et c'est vraiment important que tous les reponse doit obligatoirement en json valide sans text suplementaire.
+            Contraintes de formatage STRICTES :
+                1 - Réponds UNIQUEMENT avec un objet JSON brut.
+                2 - Ne commence PAS par une phrase d'introduction.
+                3 - Ne termine PAS par une conclusion ou des explications.
+                4 - N'utilise PAS de blocs de code Markdown (pas de ```json).
+                5 - Le contenu doit commencer par { et finir par }.
+            ===============
+        """
         completion = self.client.chat.completions.create(
             model=effective_model,
             messages=[
