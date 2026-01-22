@@ -39,4 +39,4 @@ COPY . .
 # EXPOSE 8000
 
 # ---- Default command ----
-#CMD ["python", "-u", "main.py"]
+CMD ["python", "-u", "classification_validation.py"]
