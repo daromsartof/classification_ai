@@ -97,7 +97,8 @@ class ImageRepositorie:
                 LEFT JOIN decoupage_niveau2 dc ON dc.image_id = i.id
                 LEFT JOIN ai_separation ai_s ON ai_s.image_id = i.id
                 WHERE ((((l.status_new = 4 or l.status_new = 5))))
-                and date(l.date_scan) >= DATE('2026-01-05')  
+                and date(l.date_scan) >= DATE('2026-01-05') 
+                and i.categorie_id != 27
                 and ai_s.image_id is null """
                 if client_id:
                     where_clause += f"and s.client_id = {client_id} "
