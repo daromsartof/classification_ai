@@ -87,6 +87,7 @@ class ProcessingResult:
 class ProcessingPaths:
     """Chemins utilisés pour le traitement."""
     output_path: str
+    old_output_path: str
     comptabiliser_output_path: str
     local_output_path: str
 
@@ -190,10 +191,7 @@ class ImageProcessor:
                 with open('services/prompts/banque.md', 'r', encoding='utf-8') as f:
                     prompt_extract_content = f.read()
             # Extraction du contenu de la facture
-            if data.get('categorie_id') == CategorieId.JURIDIQUES or data.get('categorie_id') == CategorieId.FISCAL or data.get('categorie_id') == CategorieId.SOCIAL:
-                invoice_content = data.get('data', {})
-            else:
-                invoice_content = self._extract_invoice_content("", image_data, prompt_extract_content)
+            invoice_content = self._extract_invoice_content("", image_data, prompt_extract_content)
                 
             if data.get('categorie_id') == CategorieId.FOURNISSEUR:
                 invoice_content = self.validation_service.content_validation(invoice_content, image_data)
@@ -252,8 +250,8 @@ class ImageProcessor:
         month = str(date_scan.month).zfill(2)
         day = str(date_scan.day).zfill(2)
         
-        output_path = f"{IMAGE_BASE}/{year}/{month}/{day}"
-        
+        output_path = f"{IMAGE_BASE}/images/{year}/{month}/{day}"
+        old_output_path = f"{IMAGE_BASE}/{year}{month}{day}"
         comptabiliser_output_path = (
             f"{IMAGE_COMPTABILISEE_BASE}/"
             f"{image_data.get('client_nom', 'inconnu')}/"
@@ -268,6 +266,7 @@ class ImageProcessor:
         
         return ProcessingPaths(
             output_path=output_path,
+            old_output_path=old_output_path,
             comptabiliser_output_path=comptabiliser_output_path,
             local_output_path=local_output_path
         )
@@ -280,7 +279,10 @@ class ImageProcessor:
         """Prépare le fichier image pour le traitement."""
         # Localisation du fichier source
         image_data['path'] = self.image_service.get_image_path(
-            image_data, image_data.get('ext_image', 'pdf'), paths.output_path
+            image_data, 
+            image_data.get('ext_image', 'pdf'), 
+            paths.output_path, 
+            paths.old_output_path
         )
         
         logger.info(f"Traitement de l'image: {image_data['name']}")

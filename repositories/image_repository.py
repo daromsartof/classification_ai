@@ -88,7 +88,7 @@ class ImageRepositorie:
             elif for_validation:
                 where_clause = f"""
                 LEFT JOIN ai_ocr_content ai_ocr ON ai_ocr.image_id = i.id
-                WHERE i.supprimer = 0 and i.source_image_id = 29 and ai_ocr.image_id is null and i.nom not like 'WYZ00004V' """
+                WHERE i.supprimer = 0 and i.source_image_id = 29 and ai_ocr.image_id is null order by d.nom asc """
             elif len(lot_ids) > 0:
                 where_clause = f"""
                 WHERE l.id IN ({','.join(map(str, lot_ids))})"""
@@ -97,7 +97,8 @@ class ImageRepositorie:
                 LEFT JOIN decoupage_niveau2 dc ON dc.image_id = i.id
                 LEFT JOIN ai_separation ai_s ON ai_s.image_id = i.id
                 WHERE ((((l.status_new = 4 or l.status_new = 5))))
-                and date(l.date_scan) >= DATE('2026-01-05')  
+                and date(l.date_scan) >= DATE('2026-01-05') 
+                and i.categorie_id != 27
                 and ai_s.image_id is null """
                 if client_id:
                     where_clause += f"and s.client_id = {client_id} "
