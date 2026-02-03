@@ -152,7 +152,7 @@ class ImageProcessor:
             # Vérification du statut du service
             self._check_service_power()
             # Vérification des images enfants
-            child_images = self._check_child_images(image_data)
+            child_images = self.check_child_images(image_data)
         
             for child_image in child_images:
                 self.process(child_image)
@@ -235,12 +235,12 @@ class ImageProcessor:
             logger.warning("Service désactivé - arrêt du traitement")
             raise TerminatePoolException("Service désactivé")
 
-    def _check_child_images(self, image_data: dict) -> list[dict]:
+    def check_child_images(self, image_data: dict) -> list[dict]:
         """Vérifie le nombre d'images enfants."""
         child_images_niveau1 = self.decoupage_niveau1_controle_repo.get_decoupage_niveau1_controle_by_imageId(
             image_data['id']
         )
-
+        
 
         if image_data.get('is_child', False) or len(child_images_niveau1) <= 1:
             return []
@@ -634,9 +634,7 @@ class ImageProcessor:
 
 def process_single_image(
     image_data: dict,
-    ai_separation_setting: dict,
-    prompt: Optional[str] = None,
-    is_training: bool = False
+    ai_separation_setting: dict
 ) -> dict:
     """
     Fonction de traitement d'une image unique (point d'entrée pour le multiprocessing).
@@ -651,17 +649,12 @@ def process_single_image(
         Dictionnaire contenant le résultat du traitement.
     """
     processor = ImageProcessor(ai_separation_setting)
-    result = processor.process(image_data, prompt)
+    result = processor.check_child_images(image_data)
     
-    return {
-        "image_id": result.image_id,
-        "categorie_id": result.categorie_id,
-        "lot_id": result.lot_id,
-        "status_new": result.status_new
-    }
+    return result
 
 
-def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: Optional[list[int]] = None, client_id: Optional[int] = None, dossier_id: Optional[int] = None) -> None:
+def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: Optional[list[int]] = None, client_id: Optional[int] = None, dossier_id: Optional[int] = None, image_name: Optional[str] = None) -> None:
     """
     Point d'entrée principal pour le traitement par lots.
     
@@ -704,6 +697,7 @@ def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: 
             lot_id=lot_id,
             lot_ids=lot_ids_list,
             client_id=client_id,
+            image_name=image_name,
             dossier_id=dossier_id
         )
         num_processes = ai_settings.get('thread_number', 1)
@@ -798,7 +792,13 @@ if __name__ == "__main__":
         default=None,
         help='ID du client à traiter'
     )
-
+    parser.add_argument(
+        '--image_name',
+        type=str,
+        default=None,
+        help='Nom de l\'image à traiter'
+    )
+    
     parser.add_argument(
         '--dossier_id',
         type=int,
@@ -814,9 +814,10 @@ if __name__ == "__main__":
             lot_id=args.lot_id,
             lot_ids=args.lot_ids,
             client_id=args.client_id,
+            image_name=args.image_name,
             dossier_id=args.dossier_id
         )
-        if args.image_id or args.lot_id or args.lot_ids or args.client_id or args.dossier_id:
+        if args.image_id or args.lot_id or args.lot_ids or args.client_id or args.dossier_id or args.image_name:
             sys.exit(0)
         logger.info("Sleeping for 2 minutes...")
 
