@@ -218,7 +218,7 @@ class ImageProcessor:
         day = str(date_scan.day).zfill(2)
         
         output_path = f"{IMAGE_BASE}/images/{year}/{month}/{day}"
-        old_output_path = f"{IMAGE_BASE}/{year}{month}{day}"
+        old_output_path = f"{IMAGE_BASE}/IMAGES/{year}{month}{day}"
         comptabiliser_output_path = (
             f"{IMAGE_COMPTABILISEE_BASE}/"
             f"{image_data.get('client_nom', 'inconnu')}/"
@@ -246,7 +246,10 @@ class ImageProcessor:
         """Prépare le fichier image pour le traitement."""
         # Localisation du fichier source
         image_data['path'] = self.image_service.get_image_path(
-            image_data, image_data.get('ext_image', 'pdf'), paths.output_path, paths.old_output_path
+            image_data, 
+            image_data.get('ext_image', 'pdf'), 
+            paths.output_path, 
+            paths.old_output_path
         )
         
         logger.info(f"Traitement de l'image: {image_data['name']}")
