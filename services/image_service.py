@@ -54,6 +54,7 @@ class ImageService:
             'OLD_IMAGE_A_TRAITER',
             r'//NAS/intranet images/NS_SU/IMAGES_A_TRAITER'
         )
+        self.NAS_BASE = os.getenv('NAS_BASE', r'//NAS/intranet images')
         self.allowed_extensions = self.DEFAULT_ALLOWED_EXTENSIONS
 
     def get_image_path(
