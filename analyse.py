@@ -217,7 +217,7 @@ class ImageProcessor:
         month = str(date_scan.month).zfill(2)
         day = str(date_scan.day).zfill(2)
         
-        output_path = f"{IMAGE_BASE}/images/{year}/{month}/{day}"
+        output_path = f"{IMAGE_BASE}/IMAGES/images/{year}/{month}/{day}"
         old_output_path = f"{IMAGE_BASE}/IMAGES/{year}{month}{day}"
         comptabiliser_output_path = (
             f"{IMAGE_COMPTABILISEE_BASE}/"
