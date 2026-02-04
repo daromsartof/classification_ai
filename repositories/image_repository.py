@@ -32,7 +32,7 @@ class ImageRepositorie:
             logger.error(f"Error fetching image by lot_id: {e}")
             return []
     
-    def get_image_to_process(self, image_id=None, lot_id=None, for_validation=False, lot_ids=[], client_id=None, dossier_id=None):
+    def get_image_to_process(self, image_id=None, lot_id=None, for_validation=False, lot_ids=[], client_id=None, dossier_id=None, for_analyse=False):
         try:
             #query = "select i.nom, l.date_scan, l.id lot_id, d.id dossier_id, d.nom dossier_name, d.site from image i join lot l on l.id = i.lot_id join dossier d on d.id = l.dossier_id where (l.status_new = 4 or l.status = 2) and date(l.date_scan) = date('2025-05-13')"
             print(image_id)
@@ -88,7 +88,21 @@ class ImageRepositorie:
             elif for_validation:
                 where_clause = f"""
                 LEFT JOIN ai_ocr_content ai_ocr ON ai_ocr.image_id = i.id
-                WHERE i.supprimer = 0 and i.source_image_id = 29 and ai_ocr.image_id is null limit 50 """
+                WHERE i.supprimer = 0 and i.source_image_id = 29 and ai_ocr.image_id is null """
+                if client_id:
+                    where_clause += f"and s.client_id = {client_id} "
+                elif dossier_id:
+                    where_clause += f"and d.id = {dossier_id} "
+                where_clause += " limit 50 """
+            elif for_analyse:
+                where_clause = f"""
+                LEFT JOIN ai_ocr_content_docs ai_ocr ON ai_ocr.image_id = i.id
+                WHERE i.supprimer = 0 and i.source_image_id = 29 and ai_ocr.image_id is null and i.categorie_id <> 27 """
+                if client_id:
+                    where_clause += f"and s.client_id = {client_id} "
+                elif dossier_id:
+                    where_clause += f"and d.id = {dossier_id} "
+                where_clause += " limit 50 """
             elif len(lot_ids) > 0:
                 where_clause = f"""
                 WHERE l.id IN ({','.join(map(str, lot_ids))})"""
