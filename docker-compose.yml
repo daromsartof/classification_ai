@@ -12,9 +12,9 @@ services:
       DB_DATABASE: ${DB_DATABASE}
       # Chemins des images dans le conteneur
       NAS_BASE: /hdd1
-      IMAGE_BASE: /hdd1/IMAGES
-      IMAGE_COMPTABILISEE_BASE: /hdd1/IMAGES/images
-      IMAGE_A_TRAITER: /hdd1/IMAGES/images
+      IMAGE_BASE: /hdd1/images
+      IMAGE_COMPTABILISEE_BASE: /hdd1/images/images
+      IMAGE_A_TRAITER: /hdd1/images/images
     volumes:
       - "./.env:/app/.env"
       - "/hdd1:/hdd1:z"
@@ -41,9 +41,9 @@ services:
       DB_DATABASE: ${DB_DATABASE}
       # Chemins des images dans le conteneur
       NAS_BASE: /hdd1
-      IMAGE_BASE: /hdd1/IMAGES
-      IMAGE_COMPTABILISEE_BASE: /hdd1/IMAGES/images
-      IMAGE_A_TRAITER: /hdd1/IMAGES/images
+      IMAGE_BASE: /hdd1/images
+      IMAGE_COMPTABILISEE_BASE: /hdd1/images/images
+      IMAGE_A_TRAITER: /hdd1/images/images
     volumes:
       - "./.env:/app/.env"
       - "/hdd1:/hdd1:z"
@@ -72,9 +72,9 @@ services:
       DB_DATABASE: ${DB_DATABASE}
       # Chemins des images dans le conteneur
       NAS_BASE: /hdd1
-      IMAGE_BASE: /hdd1/IMAGES
-      IMAGE_COMPTABILISEE_BASE: /hdd1/IMAGES/images
-      IMAGE_A_TRAITER: /hdd1/IMAGES/images
+      IMAGE_BASE: /hdd1/images
+      IMAGE_COMPTABILISEE_BASE: /hdd1/images/images
+      IMAGE_A_TRAITER: /hdd1/images/images
     volumes:
       - "./.env:/app/.env"
       - "/hdd1:/hdd1:z"
