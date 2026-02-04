@@ -186,23 +186,23 @@ async def process_image(payload: ImageIdPayload) -> ProcessResponse:
                 detail=f"Image non trouvée pour l'ID: {payload.id}"
             )
 
-        image_data = images[0]
+        
         
         # Traitement asynchrone
         loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: process_single_image(
-                image_data,
-                ai_settings,
-                payload.prompt
+        for image_data in images:   
+            await loop.run_in_executor(
+                None,
+                lambda: process_single_image(
+                    image_data,
+                    ai_settings
+                )
             )
-        )
 
         return ProcessResponse(
             success=True,
             image_id=payload.id,
-            message=f"Image traitée avec succès (catégorie: {result.get('categorie_id')})"
+            message=f"Image traitée avec succès "
         )
 
     except HTTPException:

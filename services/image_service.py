@@ -60,7 +60,8 @@ class ImageService:
         self,
         img: dict,
         ext: str = "pdf",
-        output_path: str = ""
+        output_path: str = "",
+        old_output_path: str = ""
     ) -> Path:
         """
         Localise le chemin d'un fichier image dans le système.
@@ -80,7 +81,7 @@ class ImageService:
                 - name: Nom du fichier (sans extension)
             ext: Extension du fichier (par défaut "pdf").
             output_path: Chemin de sortie alternatif.
-            
+
         Returns:
             Chemin Path vers le fichier trouvé.
             
@@ -134,6 +135,13 @@ class ImageService:
         # Tentative dans le répertoire de sortie
         if output_path:
             source_path = Path(output_path) / filename
+            if self._file_exists(source_path):
+                return source_path
+                
+        logger.debug(f"fichier non trouver dans : {source_path}")
+
+        if old_output_path:
+            source_path = Path(old_output_path) / filename
             if self._file_exists(source_path):
                 return source_path
 

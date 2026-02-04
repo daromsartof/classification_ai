@@ -51,6 +51,7 @@ from services.utils_service import UtilsService
 from services.validation_service import ValidationService
 from repositories.ai_ocr_prompts_repository import AiOcrPromptsRepository
 from repositories.ai_ocr_content_repository import AiOcrContentRepository
+from repositories.ai_ocr_content_docs_repository import AiOcrContentDocsRepository
 import json
 
 # Configuration
@@ -87,7 +88,6 @@ class ProcessingResult:
 class ProcessingPaths:
     """Chemins utilisés pour le traitement."""
     output_path: str
-    old_output_path: str
     comptabiliser_output_path: str
     local_output_path: str
 
@@ -138,6 +138,7 @@ class ImageProcessor:
         self.image_repo = ImageRepositorie()
         self.ai_ocr_prompts_repo = AiOcrPromptsRepository() 
         self.ai_ocr_content_repository = AiOcrContentRepository()
+        self.ai_ocr_content_docs_repository = AiOcrContentDocsRepository()
         self.decoupage_niveau2_repo = DecoupageNiveau2Repositorie()
         self.decoupage_niveau1_controle_repo = DecoupageNiveau1ControleRepositorie()
         self.decoupage_niveau2_controle_repo = DecoupageNiveau2ControleRepositorie()
@@ -163,47 +164,12 @@ class ImageProcessor:
             # Préparation des chemins
             paths = self._prepare_paths(image_data)
             
-            prompts = self.ai_ocr_prompts_repo.getAiOcrPromptsByCategorie(image_data['categorie_id'])
-            if not prompts:
-                logger.warning(f"Pas de prompt trouvé pour la catégorie {image_data['categorie_id']}")
-                return ProcessingResult(
-                    image_id=image_data['id'],
-                    categorie_id=image_data['categorie_id'],
-                    lot_id=image_data['lot_id'],
-                    status_new=image_data['status_new']
-                )
             # Localisation et copie du fichier
             local_path, is_local = self._prepare_image_file_with_conversion(image_data, paths)
             
-            # Vérification du nombre de pages
-            #num_pages = self._get_page_count(local_path, image_data['name'])
-            num_pages = image_data.get('nbpage', 1)
-            # Extraction du texte
-            # text = self._extract_text(local_path, image_data['name'])
-            # Validation de la classification
-            classification = self._validate_classify_document("", image_data, prompts['ai_prompt_classification'])
+            resultat = self._analyse_du_document(local_path, image_data)
 
-            # Construction des données de résultat
-            data = self._build_classification_data(classification, image_data)
-            prompt_extract_content = prompts['ai_prompt_extract_content']
-
-            if data.get('categorie_id') == CategorieId.BANQUE:
-                with open('services/prompts/banque.md', 'r', encoding='utf-8') as f:
-                    prompt_extract_content = f.read()
-            # Extraction du contenu de la facture
-            invoice_content = self._extract_invoice_content("", image_data, prompt_extract_content)
-                
-            if data.get('categorie_id') == CategorieId.FOURNISSEUR:
-                invoice_content = self.validation_service.content_validation(invoice_content, image_data)
-                
-           
-           
-            # Persistance en base de données
-            data['image_id'] = image_data['id']
-            ai_separation = self.ai_separation_repo.add_ai_separation(data)
-            if not ai_separation:
-                raise ValueError(f"Échec d'insertion ai_separation pour {image_data['name']}")
-            self._persist_results(invoice_content, image_data, prompts)
+            self._persist_results(resultat, image_data)
             
             # Nettoyage
             if is_local:
@@ -250,8 +216,8 @@ class ImageProcessor:
         month = str(date_scan.month).zfill(2)
         day = str(date_scan.day).zfill(2)
         
-        output_path = f"{IMAGE_BASE}/images/{year}/{month}/{day}"
-        old_output_path = f"{IMAGE_BASE}/{year}{month}{day}"
+        output_path = f"{IMAGE_BASE}/{year}/{month}/{day}"
+        
         comptabiliser_output_path = (
             f"{IMAGE_COMPTABILISEE_BASE}/"
             f"{image_data.get('client_nom', 'inconnu')}/"
@@ -266,7 +232,6 @@ class ImageProcessor:
         
         return ProcessingPaths(
             output_path=output_path,
-            old_output_path=old_output_path,
             comptabiliser_output_path=comptabiliser_output_path,
             local_output_path=local_output_path
         )
@@ -279,10 +244,7 @@ class ImageProcessor:
         """Prépare le fichier image pour le traitement."""
         # Localisation du fichier source
         image_data['path'] = self.image_service.get_image_path(
-            image_data, 
-            image_data.get('ext_image', 'pdf'), 
-            paths.output_path, 
-            paths.old_output_path
+            image_data, image_data.get('ext_image', 'pdf'), paths.output_path
         )
         
         logger.info(f"Traitement de l'image: {image_data['name']}")
@@ -344,101 +306,30 @@ class ImageProcessor:
         logger.info(f"Extraction terminée pour {name}")
         return text
 
-    def _validate_classify_document(
-        self,
-        text: str,
-        image_data: dict,
-        prompt: str
-    ) -> dict:
-        """Classifie le document via OpenAI."""
-        logger.info(f"Classification IA pour {image_data['name']}")
-        logger.info(f"Modèle utilisé: {self.ai_settings.get('model')}")
-        
-        response = self.openai_vision_service.categorisation(
-            prompt_system=prompt or self.ai_settings.get('prompt_systeme'),
-            image_path=image_data['path'],
-            image=image_data,
-            model=self.ai_settings.get('model', 'gpt-4o-mini'),
-        )
-        
-        logger.info(f"Classification terminée pour {image_data['name']}")
-        return response
-
-    def _extract_invoice_content( 
-        self,
-        text: str,
-        image_data: dict,
-        prompt: str
-    ) -> dict:
-        """Extrait le contenu de la facture via OpenAI."""
-        logger.info(f"Extraction du contenu de la facture pour {image_data['name']}")
-        logger.info(f"Modèle utilisé: {self.ai_settings.get('model')}")
-
-        response = self.openai_vision_service.content_extraction(
-            prompt_system=prompt or self.ai_settings.get('prompt_details'),
-            image_path=image_data['path'],
-            image=image_data,
-            model=self.ai_settings.get('model', 'gpt-4o-mini'),
-        )
-        
-        logger.info(f"Extraction du contenu de la facture terminée pour {image_data['name']}")
-        return response
-
-    def _build_classification_data(
-        self,
-        response: dict,
-        image_data: dict
-    ) -> dict:
-        """Construit les données de classification."""
-        
-        # Correction de la catégorie 14 vers fournisseur
-        categorie_id = response.get('ID', '')
-        if categorie_id == 14:
-            categorie_id = CategorieId.FOURNISSEUR
-            basculement_msg = "Basculer vers la catégorie fournisseur."
-        else:
-            basculement_msg = ""
-        
-        return {
-            "categorie_id": categorie_id,
-            "data": response.get('data', {}),
-            "ratio": int(response.get('ratio', 0)),
-            "Emetteur": response.get('Emetteur'),
-            "Recepteur": response.get('Recepteur')
-        }
-
-    def _save_ocr_content(
-        self,
-        text: str,
-        output_path: str,
-        name: str
-    ) -> None:
-        """Sauvegarde le contenu OCR dans un fichier."""
-        prefix = self.ai_settings.get('prefix', '')
-        ocr_path = f"{output_path}/{name}{prefix}.ocr"
-        
-        with open(ocr_path, 'w', encoding='utf-8') as f:
-            f.write(text)
 
     def _persist_results(
         self,
-        invoice_content: dict,
-        image_data: dict,
-        prompts: dict
+        resultat: dict,
+        image_data: dict
     ) -> dict:
         """Persiste les résultats en base de données."""
-        ai_ocr_content = self.ai_ocr_content_repository.createAiOcrContent(
+        
+        ai_ocr_content_docs = self.ai_ocr_content_docs_repository.createAiOcrContentDocs(
             {
                 "image_id": image_data['id'] if image_data else None,
-                "content": json.dumps(invoice_content, ensure_ascii=False) if invoice_content else None,
-                "ai_ocr_prompt_id": prompts.get('id', None) if prompts else None
+                "content": resultat.get("data", ""),
+                "categorie_id": resultat.get("categorie", 49),
+                "status": resultat.get("status", "green"),
+                "json_data": json.dumps({
+                    "num_facture": resultat.get("num_facture", 0)
+                })
             }
         )
 
-        if not ai_ocr_content:
-            raise ValueError(f"Échec d'insertion ai_ocr_content pour {image_data['name']}")
+        if not ai_ocr_content_docs:
+            raise ValueError(f"Échec d'insertion ai_ocr_content_docs pour {image_data['name']}")
 
-        return ai_ocr_content
+        return ai_ocr_content_docs
 
     def _log_image_action(self, image_updated: dict) -> None:
         """Log l'action sur l'image."""
@@ -501,6 +392,20 @@ class ImageProcessor:
         except Exception as e:
             logger.warning(f"Erreur lors du nettoyage: {e}")
 
+    def _analyse_du_document(self, local_path: str, image_data: dict) -> dict:
+        """Analyse le document."""
+        logger.info(f"Analyse du document pour {image_data['name']}")
+        logger.info(f"Modèle utilisé: {self.ai_settings.get('model')}")
+        
+        response = self.openai_vision_service.analyse_du_document(
+            prompt_system=self.ai_settings.get('prompt_systeme'),
+            image_path=image_data['path'],
+            image=image_data,
+            model=self.ai_settings.get('model', 'gpt-4o-mini'),
+        )
+        logger.info(f"Analyse du document terminée pour {image_data['name']}")
+        return response
+
     @staticmethod
     def _parse_date(date_value) -> datetime:
         """Parse une date depuis différents formats."""
@@ -552,14 +457,14 @@ def main() -> None:
         settings_repo = AiSeparationSettingRepository()
         
         # Récupération des paramètres
-        ai_settings = settings_repo.get_ai_separation_setting(setting_id=2)
+        ai_settings = settings_repo.get_ai_separation_setting(setting_id=3)
         
         if not ai_settings or ai_settings.get('power', 1) != 1:
             logger.warning("Service IA désactivé ou non configuré")
             return
         
         # Récupération des images à traiter
-        images = image_repo.get_image_to_process(for_validation=True)
+        images = image_repo.get_image_to_process(for_analyse=True, dossier_id=33612)
        
         num_processes = ai_settings.get('thread_number', 1)
         
