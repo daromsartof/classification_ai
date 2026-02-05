@@ -298,6 +298,37 @@ class OpenAIServiceVision:
             logger.error(f"Erreur de catégorisation Vision: {e}")
             return self._create_error_response(str(e))
 
+    def analyse_du_document(
+        self,
+        image_path: str,
+        image: dict,
+        model: str = OpenAIModel.GPT_4O_MINI.value,
+        prompt_system: Optional[str] = None
+    ) -> dict[str, Any]:
+        """
+        Analyse un document via l'IA Vision.
+        """
+        try:
+            # Construction du dictionnaire de remplacement
+            # Note: pas de document_text car on utilise la vision
+            replacements = self._build_replacements(image, [], [])
+            
+            # Chargement du template de prompt
+            system_prompt = self._load_prompt_template('services/prompts/analyse.md')
+            system_prompt = self._apply_replacements(system_prompt, replacements)
+            
+            user_prompt = "Analyse ce document comptable et classe-le selon les catégories disponibles. Extrais toutes les informations pertinentes du document."
+            response = self.call_agent_vision(
+                system_prompt=system_prompt,
+                image_path=image_path,
+                user_prompt=user_prompt,
+                model=model
+            )
+            return self.response_parse(response)
+        except Exception as e:
+            logger.error(f"Erreur d'analyse du document Vision: {e}")
+            return self._create_error_response(str(e))
+
     def validation(
         self,
         image_path: str,

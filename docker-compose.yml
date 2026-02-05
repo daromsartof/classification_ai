@@ -12,9 +12,38 @@ services:
       DB_DATABASE: ${DB_DATABASE}
       # Chemins des images dans le conteneur
       NAS_BASE: /hdd1
-      IMAGE_BASE: /hdd1/IMAGES
-      IMAGE_COMPTABILISEE_BASE: /hdd1/IMAGES/images
-      IMAGE_A_TRAITER: /hdd1/IMAGES/images
+      IMAGE_BASE: /hdd1
+      IMAGE_COMPTABILISEE_BASE: /hdd1/images/images
+      IMAGE_A_TRAITER: /hdd1/images/images
+    volumes:
+      - "./.env:/app/.env"
+      - "/hdd1:/hdd1:z"
+
+    # Décommente si ton script démarre une API (FastAPI, Flask, etc.)
+    # ports:
+    #   - "8000:8000"
+
+    # Redémarre automatiquement sauf arrêt manuel
+    restart: unless-stopped 
+
+  ai-analyse:
+    build: .
+    container_name: ai-analyse-app
+
+    command: python -u analyse.py
+    environment:
+      # Clés API / secrets
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # Base de données
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
+      # Chemins des images dans le conteneur
+      NAS_BASE: /hdd1
+      IMAGE_BASE: /hdd1
+      IMAGE_COMPTABILISEE_BASE: /hdd1/images/images
+      IMAGE_A_TRAITER: /hdd1/images/images
     volumes:
       - "./.env:/app/.env"
       - "/hdd1:/hdd1:z"
@@ -43,9 +72,9 @@ services:
       DB_DATABASE: ${DB_DATABASE}
       # Chemins des images dans le conteneur
       NAS_BASE: /hdd1
-      IMAGE_BASE: /hdd1/IMAGES
-      IMAGE_COMPTABILISEE_BASE: /hdd1/IMAGES/images
-      IMAGE_A_TRAITER: /hdd1/IMAGES/images
+      IMAGE_BASE: /hdd1/images
+      IMAGE_COMPTABILISEE_BASE: /hdd1/images/images
+      IMAGE_A_TRAITER: /hdd1/images/images
     volumes:
       - "./.env:/app/.env"
       - "/hdd1:/hdd1:z"
