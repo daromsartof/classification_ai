@@ -195,7 +195,9 @@ async def process_image(payload: ImageIdPayload) -> ProcessResponse:
                 None,
                 lambda: process_single_image(
                     image_data,
-                    ai_settings
+                    ai_settings,
+                    prompt='',
+                    is_decoupage=True,
                 )
             )
 

@@ -136,7 +136,8 @@ class ImageProcessor:
     def process(
         self,
         image_data: dict,
-        prompt: Optional[str] = None
+        prompt: Optional[str] = None,
+        is_decoupage: bool = False
     ) -> ProcessingResult:
         """
         Traite une image et retourne le résultat.
@@ -152,11 +153,11 @@ class ImageProcessor:
             # Vérification du statut du service
             self._check_service_power()
             # Vérification des images enfants
-            child_images = self.check_child_images(image_data)
+            child_images = self._check_child_images(image_data)
         
             for child_image in child_images:
-                self.process(child_image)
-                
+                self.process(child_image, prompt=prompt, is_decoupage=is_decoupage)
+
             if (image_data.get('decouper', 0) == 1 or not image_data.get('is_child', False)) and len(child_images) > 0:
                 return ProcessingResult(
                     image_id=image_data['id'],
@@ -171,47 +172,67 @@ class ImageProcessor:
             # Localisation et copie du fichier
             local_path, is_local = self._prepare_image_file(image_data, paths)
             
-            # Vérification du nombre de pages
-            num_pages = self._get_page_count(local_path, image_data['name'])
+            if not is_decoupage:
+                # Vérification du nombre de pages
+                num_pages = self._get_page_count(local_path, image_data['name'])
+                
+                # Extraction du texte
+                text = self._extract_text(local_path, image_data['name'])
+                
+                # Classification IA
+                classification = self._classify_document(text, image_data, prompt)
+                
+                # Construction des données de résultat
+                data = self._build_classification_data(classification, image_data)
+                
+                # Validation et affinement
+                data = self._validate_classification(data, image_data, text)
             
-            # Extraction du texte
-            text = self._extract_text(local_path, image_data['name'])
-            
-            # Classification IA
-            classification = self._classify_document(text, image_data, prompt)
-            
-            # Construction des données de résultat
-            data = self._build_classification_data(classification, image_data)
-            
-            # Validation et affinement
-            data = self._validate_classification(data, image_data, text)
-           
-            # Sauvegarde OCR
-            self._save_ocr_content(text, paths.output_path, image_data['name'])
-            
-            # Persistance en base de données
-            image_updated = self._persist_results(data, image_data, num_pages, paths)
+                # Sauvegarde OCR
+                self._save_ocr_content(text, paths.output_path, image_data['name'])
+                
+                # Persistance en base de données
+                image_updated = self._persist_results(data, image_data, num_pages, paths)
 
-            try:
-                # Copie des fichiers
-                self._copy_files(image_data, paths, data)
-            except Exception as e:
-                logger.error(e)
-            
-            # Nettoyage
-            if is_local:
-                self._cleanup_local_files(local_path)
-            
-            logger.info(f"Image traitée avec succès: {image_data['name']}")
-            logger.info("=" * 80)
-            
-            return ProcessingResult(
-                image_id=image_updated['id'],
-                categorie_id=image_updated['categorie_id'],
-                lot_id=image_updated['lot_id'],
-                status_new=image_updated['status_new']
-            )
-
+                try:
+                    # Copie des fichiers
+                    self._copy_files(image_data, paths, data)
+                except Exception as e:
+                    logger.error(e)
+                
+                # Nettoyage
+                if is_local:
+                    self._cleanup_local_files(local_path)
+                
+                logger.info(f"Image traitée avec succès: {image_data['name']}")
+                logger.info("=" * 80)
+                
+                return ProcessingResult(
+                    image_id=image_updated['id'],
+                    categorie_id=image_updated['categorie_id'],
+                    lot_id=image_updated['lot_id'],
+                    status_new=image_updated['status_new']
+                )
+            else : 
+                try:
+                    # Copie des fichiers
+                    self._copy_files(image_data, paths)
+                except Exception as e:
+                    logger.error(e)
+                
+                # Nettoyage
+                if is_local:
+                    self._cleanup_local_files(local_path)
+                
+                logger.info(f"Image traitée avec succès: {image_data['name']}")
+                logger.info("=" * 80)
+                
+                return ProcessingResult(
+                    image_id=image_data['id'],
+                    categorie_id=image_data['categorie_id'],
+                    lot_id=image_data['lot_id'],
+                    status_new=image_data['status_new']
+                )
         except TerminatePoolException:
             raise
         except Exception as e:
@@ -235,7 +256,7 @@ class ImageProcessor:
             logger.warning("Service désactivé - arrêt du traitement")
             raise TerminatePoolException("Service désactivé")
 
-    def check_child_images(self, image_data: dict) -> list[dict]:
+    def _check_child_images(self, image_data: dict) -> list[dict]:
         """Vérifie le nombre d'images enfants."""
         child_images_niveau1 = self.decoupage_niveau1_controle_repo.get_decoupage_niveau1_controle_by_imageId(
             image_data['id']
@@ -568,8 +589,7 @@ class ImageProcessor:
     def _copy_files(
         self,
         image_data: dict,
-        paths: ProcessingPaths,
-        data: dict
+        paths: ProcessingPaths
     ) -> None:
         """Copie les fichiers vers les destinations finales."""
         last_error: Optional[Exception] = None
@@ -625,7 +645,9 @@ class ImageProcessor:
 
 def process_single_image(
     image_data: dict,
-    ai_separation_setting: dict
+    ai_separation_setting: dict,
+    prompt: Optional[str] = None,
+    is_decoupage: bool = False
 ) -> dict:
     """
     Fonction de traitement d'une image unique (point d'entrée pour le multiprocessing).
@@ -640,9 +662,14 @@ def process_single_image(
         Dictionnaire contenant le résultat du traitement.
     """
     processor = ImageProcessor(ai_separation_setting)
-    result = processor.check_child_images(image_data)
-    
-    return result
+    result = processor.process(image_data=image_data, prompt=prompt, is_decoupage=is_decoupage)
+
+    return {
+        "image_id": result.image_id,
+        "categorie_id": result.categorie_id,
+        "lot_id": result.lot_id,
+        "status_new": result.status_new
+    }
 
 
 def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: Optional[list[int]] = None, client_id: Optional[int] = None, dossier_id: Optional[int] = None, image_name: Optional[str] = None) -> None:
@@ -688,7 +715,6 @@ def main(image_id: Optional[int] = None, lot_id: Optional[int] = None, lot_ids: 
             lot_id=lot_id,
             lot_ids=lot_ids_list,
             client_id=client_id,
-            image_name=image_name,
             dossier_id=dossier_id
         )
         num_processes = ai_settings.get('thread_number', 1)
