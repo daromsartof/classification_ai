@@ -172,67 +172,47 @@ class ImageProcessor:
             # Localisation et copie du fichier
             local_path, is_local = self._prepare_image_file(image_data, paths)
             
-            if not is_decoupage:
-                # Vérification du nombre de pages
-                num_pages = self._get_page_count(local_path, image_data['name'])
+            # Vérification du nombre de pages
+            num_pages = self._get_page_count(local_path, image_data['name'])
                 
-                # Extraction du texte
-                text = self._extract_text(local_path, image_data['name'])
+            # Extraction du texte
+            text = self._extract_text(local_path, image_data['name'])
                 
-                # Classification IA
-                classification = self._classify_document(text, image_data, prompt)
+            # Classification IA
+            classification = self._classify_document(text, image_data, prompt)
                 
-                # Construction des données de résultat
-                data = self._build_classification_data(classification, image_data)
+            # Construction des données de résultat
+            data = self._build_classification_data(classification, image_data)
                 
-                # Validation et affinement
-                data = self._validate_classification(data, image_data, text)
+            # Validation et affinement
+            data = self._validate_classification(data, image_data, text)
             
-                # Sauvegarde OCR
-                self._save_ocr_content(text, paths.output_path, image_data['name'])
+            # Sauvegarde OCR
+            self._save_ocr_content(text, paths.output_path, image_data['name'])
                 
-                # Persistance en base de données
-                image_updated = self._persist_results(data, image_data, num_pages, paths)
+            # Persistance en base de données
+            image_updated = self._persist_results(data, image_data, num_pages, paths)
 
-                try:
-                    # Copie des fichiers
-                    self._copy_files(image_data, paths, data)
-                except Exception as e:
-                    logger.error(e)
+            try:
+                # Copie des fichiers
+                self._copy_files(image_data, paths)
+            except Exception as e:
+                logger.error(e)
                 
-                # Nettoyage
-                if is_local:
-                    self._cleanup_local_files(local_path)
+            # Nettoyage
+            if is_local:
+                self._cleanup_local_files(local_path)
                 
-                logger.info(f"Image traitée avec succès: {image_data['name']}")
-                logger.info("=" * 80)
+            logger.info(f"Image traitée avec succès: {image_data['name']}")
+            logger.info("=" * 80)
                 
-                return ProcessingResult(
-                    image_id=image_updated['id'],
-                    categorie_id=image_updated['categorie_id'],
-                    lot_id=image_updated['lot_id'],
-                    status_new=image_updated['status_new']
-                )
-            else : 
-                try:
-                    # Copie des fichiers
-                    self._copy_files(image_data, paths)
-                except Exception as e:
-                    logger.error(e)
-                
-                # Nettoyage
-                if is_local:
-                    self._cleanup_local_files(local_path)
-                
-                logger.info(f"Image traitée avec succès: {image_data['name']}")
-                logger.info("=" * 80)
-                
-                return ProcessingResult(
-                    image_id=image_data['id'],
-                    categorie_id=image_data['categorie_id'],
-                    lot_id=image_data['lot_id'],
-                    status_new=image_data['status_new']
-                )
+            return ProcessingResult(
+                image_id=image_updated['id'],
+                categorie_id=image_updated['categorie_id'],
+                lot_id=image_updated['lot_id'],
+                status_new=image_updated['status_new']
+            )
+            
         except TerminatePoolException:
             raise
         except Exception as e:
